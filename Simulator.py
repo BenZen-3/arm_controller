@@ -23,6 +23,8 @@ class Simulator(pygame.sprite.Sprite):
 
         self.running = True
         self.fps = 100
+        self.block_size = 10 # set the size of the grid
+        self.pixel_per_meter = 100
 
     def run(self):
 
@@ -32,11 +34,8 @@ class Simulator(pygame.sprite.Sprite):
             self.check_quit()
 
             arm.state_update(frame_time)
-            self.draw_arm()
-
-            pygame.display.flip()
+            self.draw_all()
             time.sleep(frame_time)
-            self.screen.fill(BLACK)
 
         pygame.quit()
 
@@ -46,17 +45,115 @@ class Simulator(pygame.sprite.Sprite):
                 if event.type == pygame.QUIT:
                     self.running = False
 
+    def draw_all(self):
+
+        self.draw_grid()
+        self.draw_arm()
+        self.check_grid_occupancy()
+
+        # pygame stuff
+        pygame.display.flip()
+        self.screen.fill(BLACK)
+
     def draw_arm(self):
 
         offset = np.array([self.width/2, self.height/2])
 
         base, j1, j2 = arm.cartesian_joint_locations()
+        arm_pix_width = round(arm.linkage_width*self.pixel_per_meter)
 
-        # print(type(base))
+        base_pix = np.array(base*self.pixel_per_meter + offset).astype(int)
+        j1_pix   = np.array(j1*self.pixel_per_meter + offset).astype(int)
+        j2_pix   = np.array(j2*self.pixel_per_meter + offset).astype(int)
 
-        pygame.draw.circle(self.screen, RED, base*50+offset, 20)
-        pygame.draw.circle(self.screen, BLUE, j1*50+offset, 20)
-        pygame.draw.circle(self.screen, GREEN, j2*50+offset, 20)
+        # arm links
+        radius = round(arm_pix_width/2)
+        pygame.draw.circle(self.screen, RED, base_pix, radius)
+        pygame.draw.line(self.screen, RED, base_pix, j1_pix, arm_pix_width)
+        pygame.draw.circle(self.screen, BLUE, j1_pix, radius)
+        pygame.draw.line(self.screen, BLUE, j1_pix, j2_pix, arm_pix_width)
+        pygame.draw.circle(self.screen, GREEN, j2_pix, radius)
+
+    def draw_grid(self):
+
+        for x in range(0, self.width, self.block_size):
+            for y in range(0, self.height, self.block_size):
+                rect = pygame.Rect(x, y, self.block_size, self.block_size)
+                pygame.draw.rect(self.screen, WHITE, rect, 1)
+
+    # def check_grid_occupancy(self):
+
+    #     filled_cells = []
+
+    #     for x in range(0, self.width, self.block_size):
+    #         for y in range(0, self.height, self.block_size):
+                
+    #             if (True):
+    #                 filled_cells.append(1)
+
+        # return filled_cells
+
+    def check_grid_occupancy(self):
+
+        filled_cells = []
+        offset = np.array([self.width/2, self.height/2])
+
+        # Get arm joint locations in pixel space
+        base, j1, j2 = self.arm.cartesian_joint_locations()
+        base_pix = np.array(base * self.pixel_per_meter + offset).astype(int)
+        j1_pix = np.array(j1 * self.pixel_per_meter + offset).astype(int)
+        j2_pix = np.array(j2 * self.pixel_per_meter + offset).astype(int)
+
+        # Define line segments
+        arm_segments = [(base_pix, j1_pix), (j1_pix, j2_pix)]
+        joint_positions = [base_pix, j1_pix, j2_pix]
+
+        # Check each grid cell
+        for x in range(0, self.width, self.block_size):
+            for y in range(0, self.height, self.block_size):
+                cell_rect = pygame.Rect(x, y, self.block_size, self.block_size)
+                
+                # Check if any joint is inside the cell
+                for joint in joint_positions:
+                    if cell_rect.collidepoint(joint[0], joint[1]):
+                        filled_cells.append((x, y))
+                        pygame.draw.rect(self.screen, GREEN, cell_rect)
+                        break  # No need to check further if a joint is inside
+
+                # Check if any segment intersects the cell
+                for segment in arm_segments:
+                    if self.line_intersects_rect(segment[0], segment[1], cell_rect):
+                        filled_cells.append((x, y))
+                        pygame.draw.rect(self.screen, GREEN, cell_rect)
+                        break
+
+        return filled_cells
+
+    def line_intersects_rect(self, p1, p2, rect):
+        """Check if a line segment (p1 to p2) intersects with a rectangle."""
+        rect_lines = [
+            ((rect.left, rect.top), (rect.right, rect.top)),
+            ((rect.right, rect.top), (rect.right, rect.bottom)),
+            ((rect.right, rect.bottom), (rect.left, rect.bottom)),
+            ((rect.left, rect.bottom), (rect.left, rect.top))
+        ]
+        
+        for r1, r2 in rect_lines:
+            if self.line_intersects_line(p1, p2, r1, r2):
+                return True
+        return False
+
+    def line_intersects_line(self, p1, p2, q1, q2):
+        """Check if two line segments (p1 to p2 and q1 to q2) intersect."""
+        def ccw(a, b, c):
+            return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])
+        
+        return (ccw(p1, q1, q2) != ccw(p2, q1, q2)) and (ccw(p1, p2, q1) != ccw(p1, p2, q2))
+
+
+
+
+
 
 
 class Arm():
@@ -79,6 +176,7 @@ class Arm():
         self.m1 = m1
         self.m2 = m2
         self.g = g
+        self.linkage_width = .32
 
         # carry the state in a separate instance for clarity between params and state vars
         self.state = self.ArmState(x0,y0)
@@ -157,7 +255,7 @@ class Arm():
 
 if __name__ == "__main__":
 
-    arm = Arm()
+    arm = Arm(x0=0, y0=0, l1=2, l2=1, m1=1, m2=1, g=-9.8)
     sim = Simulator(800, 600, "Arm Simulator", arm)
 
     sim.run()
