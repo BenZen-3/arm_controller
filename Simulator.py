@@ -1,6 +1,7 @@
 import numpy as np
 import pygame
 import time
+from enum import Enum, auto
 
 WHITE =     (255, 255, 255)
 BLUE =      (  0,   0, 255)
@@ -8,7 +9,52 @@ GREEN =     (  0, 255,   0)
 RED =       (255,   0,   0)
 BLACK =     (0 ,    0,   0)
 
+class CellState(Enum):
+    NO_FILL = auto()
+    FILLED_ARM = auto()
+    FILLED_OBSTACLE = auto()
+
+
+class Voxel():
+
+    def __init__(self, x, y, block_size, state = CellState.NO_FILL):
+        
+        # the CENTER coordinates
+        self.x = x
+        self.y = y
+        self.block_size = block_size # the width and height of the cell
+        self._state = state
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        if not isinstance(value, CellState):
+            raise TypeError("Name must be a CellState")
+        self._state = value
+
+    def draw(self, screen):
+
+        if self._state == CellState.NO_FILL:
+            return # background is black already :)
+        elif self._state == CellState.FILLED_ARM:
+            self.draw_colored_cell(screen, GREEN)
+        elif self._state == CellState.FILLED_OBSTACLE:
+            self.draw_colored_cell(screen, RED)
+
+    def draw_colored_cell(self, screen, color):
+
+        left = self.x - self.block_size/2
+        top = self.y - self.block_size/2
+        rect = pygame.Rect(left, top, self.block_size, self.block_size)
+        pygame.draw.rect(screen, color, rect)
+
+
 class Simulator(pygame.sprite.Sprite):
+
+
     def __init__(self, width, height, title, arm, start = np.array([1,2]), goal = np.array([2,1])):
         super().__init__()
         self.width = width
@@ -23,8 +69,19 @@ class Simulator(pygame.sprite.Sprite):
 
         self.running = True
         self.fps = 100
-        self.block_size = 10 # set the size of the grid
+        self.block_size = 10 # set the size of the grid in pix
         self.pixel_per_meter = 100
+        self.generate_voxels()
+
+    def generate_voxels(self):
+
+        self.voxels = []
+
+        for x in range(0, self.width, self.block_size):
+            for y in range(0, self.height, self.block_size):
+                voxel = Voxel(x + self.block_size/2, y + self.block_size/2, self.block_size)
+                self.voxels.append(voxel)
+
 
     def run(self):
 
@@ -35,7 +92,7 @@ class Simulator(pygame.sprite.Sprite):
 
             arm.state_update(frame_time)
             self.draw_all()
-            time.sleep(frame_time)
+            # time.sleep(frame_time)
 
         pygame.quit()
 
@@ -47,9 +104,11 @@ class Simulator(pygame.sprite.Sprite):
 
     def draw_all(self):
 
-        self.draw_grid()
+        # self.draw_voxels()
+        # self.draw_grid() # EXTREMELY inefficient
         self.draw_arm()
-        self.check_grid_occupancy()
+        # self.check_grid_occupancy()
+        
 
         # pygame stuff
         pygame.display.flip()
@@ -81,80 +140,90 @@ class Simulator(pygame.sprite.Sprite):
                 rect = pygame.Rect(x, y, self.block_size, self.block_size)
                 pygame.draw.rect(self.screen, WHITE, rect, 1)
 
-    # def check_grid_occupancy(self):
+    def draw_voxels(self):
 
-    #     filled_cells = []
 
-    #     for x in range(0, self.width, self.block_size):
-    #         for y in range(0, self.height, self.block_size):
-                
-    #             if (True):
-    #                 filled_cells.append(1)
+        filled = self.check_grid_occupancy()
 
-        # return filled_cells
+        for voxel in filled:
+            voxel.draw(self.screen)
+
+        
+
+
+
+
+
+
 
     def check_grid_occupancy(self):
+        pass
+        # filled_cells = []
+        # offset = np.array([self.width / 2, self.height / 2])
+
+        # # Get arm joint locations in pixel space
+        # base, j1, j2 = self.arm.cartesian_joint_locations()
+        # base_pix = np.array(base * self.pixel_per_meter + offset).astype(int)
+        # j1_pix = np.array(j1 * self.pixel_per_meter + offset).astype(int)
+        # j2_pix = np.array(j2 * self.pixel_per_meter + offset).astype(int)
+
+        # # fill the cells that form the joints
+
+        # filled_cells  
+
+
+
+        # fill the cells that form the links
 
         filled_cells = []
-        offset = np.array([self.width/2, self.height/2])
-
-        # Get arm joint locations in pixel space
-        base, j1, j2 = self.arm.cartesian_joint_locations()
-        base_pix = np.array(base * self.pixel_per_meter + offset).astype(int)
-        j1_pix = np.array(j1 * self.pixel_per_meter + offset).astype(int)
-        j2_pix = np.array(j2 * self.pixel_per_meter + offset).astype(int)
-
-        # Define line segments
-        arm_segments = [(base_pix, j1_pix), (j1_pix, j2_pix)]
-        joint_positions = [base_pix, j1_pix, j2_pix]
-
-        # Check each grid cell
-        for x in range(0, self.width, self.block_size):
-            for y in range(0, self.height, self.block_size):
-                cell_rect = pygame.Rect(x, y, self.block_size, self.block_size)
-                
-                # Check if any joint is inside the cell
-                for joint in joint_positions:
-                    if cell_rect.collidepoint(joint[0], joint[1]):
-                        filled_cells.append((x, y))
-                        pygame.draw.rect(self.screen, GREEN, cell_rect)
-                        break  # No need to check further if a joint is inside
-
-                # Check if any segment intersects the cell
-                for segment in arm_segments:
-                    if self.line_intersects_rect(segment[0], segment[1], cell_rect):
-                        filled_cells.append((x, y))
-                        pygame.draw.rect(self.screen, GREEN, cell_rect)
-                        break
-
-        return filled_cells
-
-    def line_intersects_rect(self, p1, p2, rect):
-        """Check if a line segment (p1 to p2) intersects with a rectangle."""
-        rect_lines = [
-            ((rect.left, rect.top), (rect.right, rect.top)),
-            ((rect.right, rect.top), (rect.right, rect.bottom)),
-            ((rect.right, rect.bottom), (rect.left, rect.bottom)),
-            ((rect.left, rect.bottom), (rect.left, rect.top))
-        ]
         
-        for r1, r2 in rect_lines:
-            if self.line_intersects_line(p1, p2, r1, r2):
-                return True
-        return False
-
-    def line_intersects_line(self, p1, p2, q1, q2):
-        """Check if two line segments (p1 to p2 and q1 to q2) intersect."""
-        def ccw(a, b, c):
-            return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])
-        
-        return (ccw(p1, q1, q2) != ccw(p2, q1, q2)) and (ccw(p1, p2, q1) != ccw(p1, p2, q2))
 
 
 
 
 
 
+
+    #     # Define line segments
+    #     arm_segments = [(base_pix, j1_pix), (j1_pix, j2_pix)]
+
+    #     # Sample points along each arm segment
+    #     for segment in arm_segments:
+    #         sampled_points = self.sample_line(segment[0], segment[1], step=5)
+
+    #         for x in range(0, self.width, self.block_size):
+    #             for y in range(0, self.height, self.block_size):
+    #                 cell_rect = pygame.Rect(x, y, self.block_size, self.block_size)
+
+    #                 # Check if any sampled point is in the grid cell
+    #                 if any(cell_rect.collidepoint(point) for point in sampled_points):
+    #                     filled_cells.append((x, y))
+    #                     pygame.draw.rect(self.screen, GREEN, cell_rect)
+    #                     break  # Avoid unnecessary checks for this cell
+
+    #     return filled_cells
+
+    # def sample_line(self, p1, p2, step=5):
+    #     """Sample points along a line segment from p1 to p2 with a given step size."""
+    #     points = []
+    #     distance = np.linalg.norm(np.array(p2) - np.array(p1))
+    #     num_samples = max(1, int(distance / step))
+
+    #     for i in range(num_samples + 1):
+    #         t = i / num_samples
+    #         x = int(p1[0] + t * (p2[0] - p1[0]))
+    #         y = int(p1[1] + t * (p2[1] - p1[1]))
+    #         points.append((x, y))
+
+    #     return points
+
+
+
+
+
+
+
+##############################################################
 
 class Arm():
 
