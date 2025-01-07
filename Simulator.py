@@ -106,14 +106,17 @@ class Simulator(pygame.sprite.Sprite):
         start_time = time.time()
 
         while self.running:
+
+            frame_start = time.time()
             self.check_quit()
 
+            time_taken = time.time() - frame_start
             arm.state_update(frame_time)
             self.draw_all()
-            # time.sleep(frame_time)
+            time.sleep(frame_time - time_taken)
 
-            if time.time() - start_time > 10:
-                self.running = False
+            # if time.time() - start_time > 10:
+            #     self.running = False
 
         pygame.quit()
 
