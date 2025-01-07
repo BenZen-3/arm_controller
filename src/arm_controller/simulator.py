@@ -41,6 +41,9 @@ class Voxel():
         self._state = value
 
     def draw(self, screen):
+        """
+        draw the cell
+        """
 
         if self._state == CellState.NO_FILL:
             return # background is black already :)
@@ -50,6 +53,9 @@ class Voxel():
             self.draw_colored_cell(screen, RED)
 
     def draw_colored_cell(self, screen, color):
+        """
+        draws the cell as a specific color
+        """
 
         left = self.x - self.block_size/2
         top = self.y - self.block_size/2
@@ -101,6 +107,9 @@ class Simulator(pygame.sprite.Sprite):
             self.voxels.append(row)  # Add row to the grid
 
     def run(self):
+        """
+        run the sim
+        """
 
         frame_time = 1/self.fps
         
@@ -122,12 +131,22 @@ class Simulator(pygame.sprite.Sprite):
         pygame.quit()
 
     def check_quit(self):
+        """
+        checks if pygame died or you press "Q"
+        """
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
 
+            elif event.type == pygame.KEYDOWN: # Check if 'q' key was pressed
+                if event.key == pygame.K_q: 
+                    self.running = False
+
     def draw_all(self):
+        """
+        draws everything
+        """
 
         # self.draw_arm()
         self.draw_voxels()
@@ -138,6 +157,8 @@ class Simulator(pygame.sprite.Sprite):
         self.screen.fill(BLACK)
 
     def arm_joint_pixels(self):
+        """arm joint positions in pixels
+        """
 
         offset = np.array([self.width/2, self.height/2])
 
@@ -151,6 +172,9 @@ class Simulator(pygame.sprite.Sprite):
         return base_pix, j1_pix, j2_pix, arm_pix_width
 
     def draw_arm(self):
+        """
+        draws the arm
+        """
 
         # get arm config in pixels
         base_pix, j1_pix, j2_pix, arm_pix_width = self.arm_joint_pixels()
@@ -164,6 +188,9 @@ class Simulator(pygame.sprite.Sprite):
         pygame.draw.circle(self.screen, BLUE, j2_pix, radius)
 
     def draw_grid(self):
+        """
+        draws a grid
+        """
 
         for x in range(0, self.width, self.block_size):
             for y in range(0, self.height, self.block_size):
@@ -171,6 +198,9 @@ class Simulator(pygame.sprite.Sprite):
                 pygame.draw.rect(self.screen, WHITE, rect, 1)
 
     def draw_voxels(self):
+        """
+        draws all my voxels
+        """
 
         filled = self.check_grid_occupancy()
 
@@ -179,6 +209,9 @@ class Simulator(pygame.sprite.Sprite):
             voxel.draw(self.screen)
 
     def check_grid_occupancy(self):
+        """
+        Checks where the arm is by casting a ray along each of the arm linkages
+        """
 
         base_pix, j1_pix, j2_pix, arm_pix_width = self.arm_joint_pixels()
 
@@ -190,6 +223,7 @@ class Simulator(pygame.sprite.Sprite):
 def raycast(grid, start, end, block_size):
     """
     Perform a raycast on a grid of voxels and collect all collisions.
+    Algorithm: modified 'fast voxel traversal for ray tracing' (might contain mistakes)
 
     Parameters:
     - grid: 2D list of Voxel objects.
@@ -206,8 +240,6 @@ def raycast(grid, start, end, block_size):
     # Convert world coordinates to grid indices
     x0_idx = int(x0 // block_size)
     y0_idx = int(y0 // block_size)
-    x1_idx = int(x1 // block_size)
-    y1_idx = int(y1 // block_size)
 
     dx = x1 - x0
     dy = y1 - y0

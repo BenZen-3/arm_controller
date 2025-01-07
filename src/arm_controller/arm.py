@@ -3,6 +3,9 @@ import numpy as np
 class Arm():
 
     class ArmState:
+        """
+        contains all the stateful things that the arm has
+        """
 
         def __init__(self, x0=0.0, y0=0.0, theta1=0.0, theta2=0.0, theta1_dot=0.0, theta2_dot=0.0):
             self.x0 = x0
@@ -14,7 +17,7 @@ class Arm():
 
     def __init__(self, x0=0, y0=0, l1=1, l2=1, m1=1, m2=1, g=-9.8):
         
-        # params
+        # params, not modified 
         self.l1 = l1
         self.l2 = l2
         self.m1 = m1
@@ -26,6 +29,9 @@ class Arm():
         self.state = self.ArmState(x0,y0)
 
     def dynamics(self):
+        """
+        calculates the M, C, G matrices for dynamics of the 2DoF linkage
+        """
 
         # state
         theta1 = self.state.theta1
@@ -62,15 +68,23 @@ class Arm():
 
         return M, C, G
 
-    def state_update(self, dt, U=np.array([[0], [0]])):
+    def state_update(self, dt, U=np.array([[0], [0]])): # not even sure if that shape is correct? 
+        """
+        Update the state given some dt and control vecotr U
+        """
+
         def dynamics_wrapper(theta1, theta2, theta1_dot, theta2_dot):
+            """
+            mini wrapper for the dynamics calcs so that RK4 can be run
+            """
+
             self.state.theta1 = theta1
             self.state.theta2 = theta2
             self.state.theta1_dot = theta1_dot
             self.state.theta2_dot = theta2_dot
             
             M, C, G = self.dynamics()
-            M_inv = np.linalg.inv(M) # can i switch to a solve instead?
+            M_inv = np.linalg.inv(M) # can i switch to a solve instead? this is expensive
             q_dd = np.dot(M_inv, -C - G + U)
             
             return np.array([theta1_dot, theta2_dot, q_dd[0][0], q_dd[1][0]])
@@ -85,9 +99,13 @@ class Arm():
 
         state += (k1 + 2.0*k2 + 2.0*k3 + k4) / 6
         
+        # update the state var here
         self.state.theta1, self.state.theta2, self.state.theta1_dot, self.state.theta2_dot = state
 
     def cartesian_joint_locations(self):
+        """
+        where the arm joints are in cartesian
+        """
 
         x1 = self.l1 * np.cos(self.state.theta1)
         y1 = self.l1 * np.sin(self.state.theta1)
