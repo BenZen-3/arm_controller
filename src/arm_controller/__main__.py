@@ -1,7 +1,8 @@
 import argparse
-from .simulator import Simulator
+from .simulator import Simulator, SimulationPlayer, CellState, Recording
 from .arm import Arm
 # from .learning import 
+import numpy as np
 
 
 def main():
@@ -26,8 +27,33 @@ def simulator_mode():
     print("Simulator mode")
 
     arm = Arm(x0=0, y0=0, l1=2, l2=2, m1=1, m2=1, g=-9.8)
-    sim = Simulator(800, 600, "Arm Simulator", arm)
-    sim.run()
+    sim = Simulator(800, 600, arm)
+    recording = sim.run()
+
+    # Recording.frame_printer(recording.frame_sequence[30])
+
+    # print(len(recording.frame_sequence))
+
+    # print(np.shape(recording.frame_sequence))
+
+    # for row in recording.frame_sequence[30]:
+
+    #     row_output = ""
+    #     for voxel in row:
+    #         if voxel.state != CellState.NO_FILL:
+    #             row_output += "O"
+    #         else:
+    #             row_output += " "
+
+    #     print(row_output)
+
+    # for frame in recording.frame_sequence:
+    #     Recording.frame_printer(frame)
+
+
+    player = SimulationPlayer(sim.width, sim.height)
+    player.play(recording)
+
 
 def data_collection_mode():
     print("Data Collection mode")
