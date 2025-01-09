@@ -68,34 +68,34 @@ class Arm():
 
         return M, C, G
 
+    def dynamics_wrapper(self, theta1, theta2, theta1_dot, theta2_dot, U):
+        """
+        mini wrapper for the dynamics calcs so that RK4 can be run
+        """
+
+        self.state.theta1 = theta1
+        self.state.theta2 = theta2
+        self.state.theta1_dot = theta1_dot
+        self.state.theta2_dot = theta2_dot
+        
+        M, C, G = self.dynamics()
+        M_inv = np.linalg.inv(M) # can i switch to a solve instead? this is expensive
+        q_dd = np.dot(M_inv, -C - G + U)
+        
+        return np.array([theta1_dot, theta2_dot, q_dd[0][0], q_dd[1][0]])
+
     def state_update(self, dt, U=np.array([[0], [0]])): # not even sure if that shape is correct? 
         """
         Update the state given some dt and control vecotr U
         """
-
-        def dynamics_wrapper(theta1, theta2, theta1_dot, theta2_dot):
-            """
-            mini wrapper for the dynamics calcs so that RK4 can be run
-            """
-
-            self.state.theta1 = theta1
-            self.state.theta2 = theta2
-            self.state.theta1_dot = theta1_dot
-            self.state.theta2_dot = theta2_dot
-            
-            M, C, G = self.dynamics()
-            M_inv = np.linalg.inv(M) # can i switch to a solve instead? this is expensive
-            q_dd = np.dot(M_inv, -C - G + U)
-            
-            return np.array([theta1_dot, theta2_dot, q_dd[0][0], q_dd[1][0]])
         
         # RK4 Integration
         state = np.array([self.state.theta1, self.state.theta2, self.state.theta1_dot, self.state.theta2_dot])
         
-        k1 = dt * dynamics_wrapper(*state)
-        k2 = dt * dynamics_wrapper(*(state + 0.5 * k1))
-        k3 = dt * dynamics_wrapper(*(state + 0.5 * k2))
-        k4 = dt * dynamics_wrapper(*(state + k3))
+        k1 = dt * self.dynamics_wrapper(*state, U)
+        k2 = dt * self.dynamics_wrapper(*(state + 0.5 * k1), U)
+        k3 = dt * self.dynamics_wrapper(*(state + 0.5 * k2), U)
+        k4 = dt * self.dynamics_wrapper(*(state + k3), U)
 
         state += (k1 + 2.0*k2 + 2.0*k3 + k4) / 6
         
@@ -107,8 +107,8 @@ class Arm():
         where the arm joints are in cartesian
         """
 
-        x1 = self.l1 * np.cos(self.state.theta1)
-        y1 = self.l1 * np.sin(self.state.theta1)
+        x1 = self.l1 * np.cos(self.state.theta1) + self.state.x0
+        y1 = self.l1 * np.sin(self.state.theta1) + self.state.y0
         x2 = x1 + self.l2 * np.cos(self.state.theta1 + self.state.theta2)
         y2 = y1 + self.l2 * np.sin(self.state.theta1 + self.state.theta2)
 
