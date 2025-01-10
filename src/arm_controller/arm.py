@@ -72,6 +72,10 @@ class Arm():
         """
         mini wrapper for the dynamics calcs so that RK4 can be run
         """
+        # note this flatten stuff was chatgpt and not verified. below is what I know is right
+        # M_inv = np.linalg.inv(M)
+        # q_dd = np.dot(M_inv, -C - G + U)
+        # return np.array([theta1_dot, theta2_dot, q_dd[0][0], q_dd[1][0]])
 
         self.state.theta1 = theta1
         self.state.theta2 = theta2
@@ -79,10 +83,9 @@ class Arm():
         self.state.theta2_dot = theta2_dot
         
         M, C, G = self.dynamics()
-        M_inv = np.linalg.inv(M) # can i switch to a solve instead? this is expensive
-        q_dd = np.dot(M_inv, -C - G + U)
-        
-        return np.array([theta1_dot, theta2_dot, q_dd[0][0], q_dd[1][0]])
+        q_dd = np.linalg.solve(M, -C.flatten() - G.flatten() + U.flatten())
+
+        return np.array([theta1_dot, theta2_dot, q_dd[0], q_dd[1]])
 
     def state_update(self, dt, U=np.array([[0], [0]])): # not even sure if that shape is correct? 
         """
@@ -113,3 +116,4 @@ class Arm():
         y2 = y1 + self.l2 * np.sin(self.state.theta1 + self.state.theta2)
 
         return np.array([self.state.x0,self.state.y0]), np.array([x1,y1]), np.array([x2,y2])
+    

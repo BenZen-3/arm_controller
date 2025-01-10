@@ -22,59 +22,6 @@ class VoxelState(Enum):
     FILLED_OBSTACLE = 2
 
 
-class Voxel:
-
-    def __init__(self, x, y, voxel_size, state = VoxelState.NO_FILL):
-        
-        # the CENTER coordinates
-        self.x = x
-        self.y = y
-        self.voxel_size = voxel_size # the width and height of the voxel
-        self._state = state
-
-    @property
-    def state(self):
-        return self._state
-
-    @state.setter
-    def state(self, value):
-        if not isinstance(value, VoxelState):
-            raise TypeError("Name must be a VoxelState")
-        self._state = value
-
-    def draw(self, screen):
-        """
-        draw the voxel
-        """
-
-        if self._state == VoxelState.NO_FILL:
-            return # background is black already :)
-        elif self._state == VoxelState.FILLED_ARM:
-            self.draw_colored_vox(screen, GREEN)
-        elif self._state == VoxelState.FILLED_OBSTACLE:
-            self.draw_colored_vox(screen, RED)
-
-    def draw_colored_vox(self, screen, color):
-        """
-        draws the voxel as a specific color
-        """
-
-        left = self.x - self.voxel_size/2
-        top = self.y - self.voxel_size/2
-        rect = pygame.Rect(left, top, self.voxel_size, self.voxel_size)
-        pygame.draw.rect(screen, color, rect)
-
-    # @classmethod
-    # def draw_cell_value(self, value, screen, voxel_size):
-
-    #     if value == VoxelState.NO_FILL.value:
-    #         return # background is black already :)
-    #     elif value == VoxelState.FILLED_ARM.value:
-    #         self.draw_colored_cell(screen, GREEN)
-    #     elif value == VoxelState.FILLED_OBSTACLE.value:
-    #         self.draw_colored_cell(screen, RED)
-
-
 class SimulationPlayer:
     
     def __init__(self, width, height):
@@ -93,11 +40,6 @@ class SimulationPlayer:
         frame_time = 1/recording.fps
         self.running = True
 
-        # print('converting recording')
-        # voxel_sequence = recording.convert_to_voxel_seq()
-        # print(np.shape(voxel_sequence))
-        # print('here')
-
         for frame in recording.frame_sequence:#voxel_sequence:
             # print(type(frame))
 
@@ -110,7 +52,8 @@ class SimulationPlayer:
             time_taken = time.time() - frame_start
             pause_time = frame_time - time_taken
             if pause_time > 0:
-                time.sleep(frame_time - time_taken)
+                # time.sleep(frame_time - time_taken)
+                pass
             else:
                 print("WAAAAAAAAAAA")
 
@@ -119,7 +62,7 @@ class SimulationPlayer:
 
         pygame.quit()
 
-    def draw_frame(self, frame):
+    def draw_frame(self, frame): # TODO: This doesnt work at all
 
         print(np.shape(frame))
         
@@ -181,37 +124,13 @@ class Recording:
             self.name = name
 
     def record_frame(self, voxel_grid):
-
-        # data = []
-
-        # for voxel_row in voxel_grid:
-        #     data_row = []
-        #     for voxel in voxel_row:
-        #         data_row.append(voxel.state.value)
-        #     data.append(data_row)
-
+        """
+        copies the voxel array and appends it to the frame seq
+        """
         self.frame_sequence.append(np.copy(voxel_grid))
 
     def save_as_file(self):
         pass
-
-    def convert_to_voxel_seq(self):
-
-        frame_vox_seq = []
-        for frame in self.frame_sequence:
-
-            voxel_sequence = []
-            for row_num, data_row in enumerate(frame):
-                voxel_row = []
-                x = self.voxel_size /2 + row_num
-                for col_num, value in enumerate(data_row):
-                    y = self.voxel_size /2 + col_num
-                    voxel = Voxel(x, y, self.voxel_size, VoxelState.FILLED_ARM)
-                    voxel_row.append(voxel)
-                voxel_sequence.append(voxel_row)
-            frame_vox_seq.append(voxel_sequence)
-
-        return frame_vox_seq
 
     @classmethod
     def frame_printer(self, frame):
@@ -245,7 +164,6 @@ class Simulator:
         self.running = False
         self.fps = 100
         self.voxel_size = voxel_size # in meters
-        # self.pixel_per_meter = 100 # OLD REMOVE
 
         self.check_conditions()
         self.generate_voxels()
@@ -270,7 +188,6 @@ class Simulator:
 
         num_hor_vox = int(Decimal(str(self.width)) // Decimal(str(self.voxel_size)))
         num_vert_vox = int(Decimal(str(self.height)) // Decimal(str(self.voxel_size)))
-        # print(VoxelState.NO_FILL.value)
         self.voxels = np.ones([num_hor_vox, num_vert_vox]) * VoxelState.NO_FILL.value
 
     def run(self, sim_time=10):
@@ -286,30 +203,13 @@ class Simulator:
 
             self.arm.state_update(frame_time)
             self.fill_arm_voxels()
-
             self.recording.record_frame(self.voxels)
 
-            # timing
+            # timing, can put in while loop if nothing else breaks the total time?
             total_time += frame_time
             if total_time >= sim_time: self.running = False
 
         return self.recording
-
-    def arm_joint_cartesian(self): # OLD REMOVE
-        """
-        get the arm joint positions in cartesian
-        """
-
-        offset = np.array([self.width/2, self.height/2])
-
-        base, j1, j2 = self.arm.cartesian_joint_locations()
-        arm_pix_width = round(self.arm.linkage_width*self.pixel_per_meter)
-
-        base_pix = np.array(base*self.pixel_per_meter + offset).astype(int)
-        j1_pix   = np.array(j1*self.pixel_per_meter + offset).astype(int)
-        j2_pix   = np.array(j2*self.pixel_per_meter + offset).astype(int)
-
-        return base_pix, j1_pix, j2_pix, arm_pix_width
 
     def fill_arm_voxels(self):
         """
@@ -319,10 +219,7 @@ class Simulator:
         filled = self.check_arm_occupancy()
         self.voxels *= VoxelState.NO_FILL.value # remove all previous filled areas
 
-        # print(len(filled))
-
         for location in filled:
-            # print(location)
             x,y = location
             self.voxels[x,y] = VoxelState.FILLED_ARM.value
 
@@ -332,29 +229,14 @@ class Simulator:
         """
 
         base, j1, j2 = self.arm.cartesian_joint_locations()
-        # print(base, j1, j2)
-
-        # print(np.shape(self.voxels))
-
-        # v=self.raycast(self.voxels, [3,2], [4,4], self.voxel_size)
-        # return v
-
         v1 = self.raycast(self.voxels, base, j1, self.voxel_size)
         v2 = self.raycast(self.voxels, j1, j2, self.voxel_size)
         return v2 + v1
 
-    def vox_pos(self, id_x, id_y):
-        """
-        get the voxel's cartesian position based on its index
-        """
-        x = id_x * self.voxel_size
-        y = id_y * self.voxel_size
-        return (x, y)
-
     def raycast(self, grid, start, end, voxel_size):
         """
         Perform a raycast on a grid of voxels and collect all collisions.
-        Algorithm: modified 'fast voxel traversal for ray tracing' (might contain mistakes)
+        Optimized version of the 'fast voxel traversal for ray tracing' algorithm.
 
         Parameters:
         - grid: 2D list of Voxel objects.
@@ -371,13 +253,8 @@ class Simulator:
         # Convert world coordinates to grid indices
         x0_idx = int(x0 // voxel_size)
         y0_idx = int(y0 // voxel_size)
-
-        # print(f"{x0=}")
-        # print(f"{y0=}")
-        # print(f"{x0_idx=}")
-        # print(f"{y0_idx=}")
-        # print(f"{x1=}")
-        # print(f"{y1=}")
+        x1_idx = int(x1 // voxel_size)
+        y1_idx = int(y1 // voxel_size)
 
         dx = x1 - x0
         dy = y1 - y0
@@ -394,32 +271,19 @@ class Simulator:
         vox_row = x0_idx
         vox_col = y0_idx
 
-        collided_voxels = []
+        collided_voxels = set()  # Use a set for fast membership checking
 
-        ray_len = 0.0
-        max_ray_len = math.sqrt(dx**2 + dy**2)
-        # print(f"{max_ray_len=}")
+        max_steps = int(math.sqrt((x1_idx - x0_idx)**2 + (y1_idx - y0_idx)**2)) + 1
 
         # DDA Traversal Loop
-        while ray_len < max_ray_len:
-
+        for _ in range(max_steps):
             # Check if within bounds
-            if (0 <= vox_row < len(grid[0])) and (0 <= vox_col < len(grid)):
-                voxel = self.vox_pos(vox_row, vox_col)#grid[current_y][current_x] # YEAH ITS A LITTLE BIT BACKWARDS I KNOW
-                # print(voxel)
-
-                if (vox_col, vox_row) not in collided_voxels:
-                    collided_voxels.append((vox_col, vox_row))
-
+            if 0 <= vox_row < len(grid[0]) and 0 <= vox_col < len(grid):
+                vox_ids = (vox_col, vox_row)
+                if vox_ids not in collided_voxels:
+                    collided_voxels.add(vox_ids)
             else:
-                break # I can't think of how a ray would exit and then return to the grid?
-
-            # yeah so like uhh if its longer than it should be then please kill this loop
-            ray_len = math.sqrt((voxel[0]-x0)**2 + (voxel[1]-y0)**2)
-            # print(f"here with ray len at {ray_len} and max {max_ray_len} and {voxel=}")
-
-            if ray_len > max_ray_len:
-                break
+                break  # Stop if outside the grid
 
             # Move to the next voxel
             if t_max_x < t_max_y:
@@ -429,9 +293,8 @@ class Simulator:
                 t_max_y += t_delta_y
                 vox_col += step_y
 
-        # print(f"returned a collided voxel array or length: {len(collided_voxels)}")
-        # print(self.vox_pos(loc[0], loc[1]) for loc in collided_voxels)
-        return collided_voxels
+        return list(collided_voxels)
+
 
 
 class Deprecated:
@@ -462,21 +325,106 @@ class Deprecated:
                 rect = pygame.Rect(x, y, self.voxel_size, self.voxel_size)
                 pygame.draw.rect(self.screen, WHITE, rect, 1)
 
+    def arm_joint_cartesian(self): # OLD REMOVE
+        """
+        get the arm joint positions in cartesian
+        """
+
+        offset = np.array([self.width/2, self.height/2])
+
+        base, j1, j2 = self.arm.cartesian_joint_locations()
+        arm_pix_width = round(self.arm.linkage_width*self.pixel_per_meter)
+
+        base_pix = np.array(base*self.pixel_per_meter + offset).astype(int)
+        j1_pix   = np.array(j1*self.pixel_per_meter + offset).astype(int)
+        j2_pix   = np.array(j2*self.pixel_per_meter + offset).astype(int)
+
+        return base_pix, j1_pix, j2_pix, arm_pix_width
+
+    def convert_to_voxel_seq(self): # DEPRECATED
+
+        frame_vox_seq = []
+        for frame in self.frame_sequence:
+
+            voxel_sequence = []
+            for row_num, data_row in enumerate(frame):
+                voxel_row = []
+                x = self.voxel_size /2 + row_num
+                for col_num, value in enumerate(data_row):
+                    y = self.voxel_size /2 + col_num
+                    voxel = Voxel(x, y, self.voxel_size, VoxelState.FILLED_ARM)
+                    voxel_row.append(voxel)
+                voxel_sequence.append(voxel_row)
+            frame_vox_seq.append(voxel_sequence)
+
+        return frame_vox_seq
+
+    def main(self):
+        arm = Arm(x0=0, y0=0, l1=2, l2=2, m1=1, m2=1, g=-9.8)
+        sim = Simulator(800, 600, "Arm Simulator", arm)
+
+
+        with cProfile.Profile() as pr:
+            sim.run()
+
+        stats = pstats.Stats(pr)
+        stats.sort_stats(pstats.SortKey.TIME)
+
+        stats.print_stats()
+
+
+class VoxelDEPRECATED:
+
+    def __init__(self, x, y, voxel_size, state = VoxelState.NO_FILL):
+        
+        # the CENTER coordinates
+        self.x = x
+        self.y = y
+        self.voxel_size = voxel_size # the width and height of the voxel
+        self._state = state
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        if not isinstance(value, VoxelState):
+            raise TypeError("Name must be a VoxelState")
+        self._state = value
+
+    def draw(self, screen):
+        """
+        draw the voxel
+        """
+
+        if self._state == VoxelState.NO_FILL:
+            return # background is black already :)
+        elif self._state == VoxelState.FILLED_ARM:
+            self.draw_colored_vox(screen, GREEN)
+        elif self._state == VoxelState.FILLED_OBSTACLE:
+            self.draw_colored_vox(screen, RED)
+
+    def draw_colored_vox(self, screen, color):
+        """
+        draws the voxel as a specific color
+        """
+
+        left = self.x - self.voxel_size/2
+        top = self.y - self.voxel_size/2
+        rect = pygame.Rect(left, top, self.voxel_size, self.voxel_size)
+        pygame.draw.rect(screen, color, rect)
+
+    # @classmethod
+    # def draw_cell_value(self, value, screen, voxel_size):
+
+    #     if value == VoxelState.NO_FILL.value:
+    #         return # background is black already :)
+    #     elif value == VoxelState.FILLED_ARM.value:
+    #         self.draw_colored_cell(screen, GREEN)
+    #     elif value == VoxelState.FILLED_OBSTACLE.value:
+    #         self.draw_colored_cell(screen, RED)
 
 
 if __name__ == "__main__":
-
-    arm = Arm(x0=0, y0=0, l1=2, l2=2, m1=1, m2=1, g=-9.8)
-    sim = Simulator(800, 600, "Arm Simulator", arm)
-
-
-    with cProfile.Profile() as pr:
-        sim.run()
-
-    stats = pstats.Stats(pr)
-    stats.sort_stats(pstats.SortKey.TIME)
-
-    stats.print_stats()
-
-    
-     
+    pass
