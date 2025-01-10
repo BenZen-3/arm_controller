@@ -46,8 +46,8 @@ def simulator_mode():
     sim = Simulator(width, height, arm, voxel_size=.05)
     print('starting')
     start = time.time()
-    # recording = sim.run(100)
-    profile_func(sim.run, 100)
+    recording = sim.run(100)
+    # profile_func(sim.run, 100)
     print("done recording")
     print(time.time() - start)
 

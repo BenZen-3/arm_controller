@@ -6,6 +6,9 @@ from . import Arm
 import math
 from datetime import datetime
 from decimal import Decimal
+from numba import njit, prange
+
+
 
 import cProfile
 import pstats
@@ -64,7 +67,7 @@ class SimulationPlayer:
 
     def draw_frame(self, frame): # TODO: This doesnt work at all
 
-        print(np.shape(frame))
+        # print(np.shape(frame))
         
         for voxel_row in frame:
             for voxel in voxel_row:
@@ -231,9 +234,153 @@ class Simulator:
         base, j1, j2 = self.arm.cartesian_joint_locations()
         v1 = self.raycast(self.voxels, base, j1, self.voxel_size)
         v2 = self.raycast(self.voxels, j1, j2, self.voxel_size)
-        return v2 + v1
+        # print(v1)
+        # print(v2)
+        # a = v2.tolist() + v1.tolist()
+        # print(a)
+        # print(np.shape(a))
 
-    def raycast(self, grid, start, end, voxel_size):
+        return v1 + v2
+    
+    # @staticmethod
+    # # @njit
+    # def raycast(grid, start, end, voxel_size):
+    #     """
+    #     Perform a raycast on a grid of voxels and collect all collisions.
+    #     Optimized with Numba.
+        
+    #     Parameters:
+    #     - grid: 2D numpy array of voxel states (e.g., 1 for occupied, 0 for empty).
+    #     - start: (x0, y0) start point of the ray.
+    #     - end: (x1, y1) end point of the ray.
+    #     - voxel_size: Size of each voxel.
+        
+    #     Returns:
+    #     - List of voxel indices that the ray intersects.
+    #     """
+    #     x0, y0 = start
+    #     x1, y1 = end
+
+    #     # Convert world coordinates to grid indices
+    #     x0_idx = int(x0 // voxel_size)
+    #     y0_idx = int(y0 // voxel_size)
+    #     x1_idx = int(x1 // voxel_size)
+    #     y1_idx = int(y1 // voxel_size)
+
+    #     dx = x1 - x0
+    #     dy = y1 - y0
+
+    #     step_x = 1 if dx > 0 else -1
+    #     step_y = 1 if dy > 0 else -1
+
+    #     t_max_x = ((x0_idx + (step_x > 0)) * voxel_size - x0) / dx if dx != 0 else float('inf')
+    #     t_max_y = ((y0_idx + (step_y > 0)) * voxel_size - y0) / dy if dy != 0 else float('inf')
+
+    #     t_delta_x = voxel_size / abs(dx) if dx != 0 else float('inf')
+    #     t_delta_y = voxel_size / abs(dy) if dy != 0 else float('inf')
+
+    #     vox_row = x0_idx
+    #     vox_col = y0_idx
+
+    #     max_ray_len = math.sqrt(dx**2 + dy**2)
+    #     collided_voxels = []
+
+    #     # DDA Traversal Loop
+    #     while True:
+    #         # Check if within bounds
+    #         if 0 <= vox_row < grid.shape[1] and 0 <= vox_col < grid.shape[0]:
+    #             collided_voxels.append((vox_col, vox_row))
+    #         else:
+    #             break  # Exit if the ray goes out of bounds
+
+    #         # Calculate ray length and exit if it exceeds maximum
+    #         ray_len = math.sqrt((vox_row * voxel_size - x0)**2 + (vox_col * voxel_size - y0)**2)
+    #         if ray_len > max_ray_len:
+    #             break
+
+    #         # Move to the next voxel
+    #         if t_max_x < t_max_y:
+    #             t_max_x += t_delta_x
+    #             vox_row += step_x
+    #         else:
+    #             t_max_y += t_delta_y
+    #             vox_col += step_y
+
+    #     return collided_voxels
+
+    # @staticmethod
+    # # @njit
+    # def raycast(grid, start, end, voxel_size):
+    #     """
+    #     Perform a raycast on a grid of voxels and collect all collisions.
+    #     Optimized with Numba by replacing dynamic lists with a preallocated array.
+        
+    #     Parameters:
+    #     - grid: 2D numpy array of voxel states (e.g., 1 for occupied, 0 for empty).
+    #     - start: (x0, y0) start point of the ray.
+    #     - end: (x1, y1) end point of the ray.
+    #     - voxel_size: Size of each voxel.
+        
+    #     Returns:
+    #     - NumPy array of voxel indices that the ray intersects (valid entries only).
+    #     """
+    #     x0, y0 = start
+    #     x1, y1 = end
+
+    #     # Convert world coordinates to grid indices
+    #     x0_idx = int(x0 // voxel_size)
+    #     y0_idx = int(y0 // voxel_size)
+    #     dx = x1 - x0
+    #     dy = y1 - y0
+
+    #     step_x = 1 if dx > 0 else -1
+    #     step_y = 1 if dy > 0 else -1
+
+    #     t_max_x = ((x0_idx + (step_x > 0)) * voxel_size - x0) / dx if dx != 0 else float('inf')
+    #     t_max_y = ((y0_idx + (step_y > 0)) * voxel_size - y0) / dy if dy != 0 else float('inf')
+
+    #     t_delta_x = voxel_size / abs(dx) if dx != 0 else float('inf')
+    #     t_delta_y = voxel_size / abs(dy) if dy != 0 else float('inf')
+
+    #     vox_row = x0_idx
+    #     vox_col = y0_idx
+
+    #     max_ray_len = math.sqrt(dx**2 + dy**2)
+
+    #     # Estimate max possible number of voxel intersections
+    #     max_voxels = int(max_ray_len / voxel_size) + 100  # Add a safety margin
+    #     collided_voxels = np.empty((max_voxels, 2), dtype=np.int32)
+    #     voxel_count = 0
+
+
+    #     # DDA Traversal Loop
+    #     while True:
+    #         # Check if within bounds
+    #         if 0 <= vox_row < grid.shape[1] and 0 <= vox_col < grid.shape[0]:
+    #             collided_voxels[voxel_count] = (vox_col, vox_row)
+    #             voxel_count += 1
+    #         else:
+    #             break  # Exit if the ray goes out of bounds
+
+    #         # Calculate ray length and exit if it exceeds maximum
+    #         ray_len = math.sqrt((vox_row * voxel_size - x0)**2 + (vox_col * voxel_size - y0)**2)
+    #         if ray_len > max_ray_len:
+    #             break
+
+    #         # Move to the next voxel
+    #         if t_max_x < t_max_y:
+    #             t_max_x += t_delta_x
+    #             vox_row += step_x
+    #         else:
+    #             t_max_y += t_delta_y
+    #             vox_col += step_y
+
+    #     # Return only valid entries
+    #     return collided_voxels[:voxel_count]
+
+
+    @staticmethod
+    def raycast(grid, start, end, voxel_size):
         """
         Perform a raycast on a grid of voxels and collect all collisions.
         Optimized version of the 'fast voxel traversal for ray tracing' algorithm.
@@ -271,14 +418,24 @@ class Simulator:
         vox_row = x0_idx
         vox_col = y0_idx
 
+        max_steps = int(math.sqrt((x1_idx - x0_idx)**2 + (y1_idx - y0_idx)**2)) + 1
+        row_max = len(grid[0])
+        col_max = len(grid)
+
+    #     return self.loop_traversal(max_steps, row_max, col_max, t_max_x, t_max_y, t_delta_x, t_delta_y, vox_row, vox_col, step_x, step_y)
+
+    # @staticmethod
+    # # @njit
+    # def loop_traversal(max_steps, row_max, col_max, t_max_x, t_max_y, t_delta_x, t_delta_y, vox_row, vox_col, step_x, step_y):
+    #     """
+    #     DDA Traversal Loop
+    #     """
+
         collided_voxels = set()  # Use a set for fast membership checking
 
-        max_steps = int(math.sqrt((x1_idx - x0_idx)**2 + (y1_idx - y0_idx)**2)) + 1
-
-        # DDA Traversal Loop
         for _ in range(max_steps):
             # Check if within bounds
-            if 0 <= vox_row < len(grid[0]) and 0 <= vox_col < len(grid):
+            if 0 <= vox_row < row_max and 0 <= vox_col < col_max:
                 vox_ids = (vox_col, vox_row)
                 if vox_ids not in collided_voxels:
                     collided_voxels.add(vox_ids)
