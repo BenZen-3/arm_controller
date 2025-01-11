@@ -42,12 +42,12 @@ def main():
 def simulator_mode():
     print("Simulator mode")
 
-    # _, recording = BatchProcessor.run_single_simulation(999,10,save=False)
+    _, recording = BatchProcessor.run_single_simulation(999,10,save=False)
 
-    playback_file = "real.npy"
-    # playback_file = "7_simulation_data_2025-01-11_06_51_42.npy"
-    recording = Recording()
-    recording.init_from_file(playback_file)
+    # playback_file = "real.npy"
+    # recording = Recording()
+    # recording.init_from_file(playback_file)
+
     player = SimulationPlayer(800, 800)
     player.play(recording)
 
@@ -56,7 +56,7 @@ def data_generator_mode():
     start = time.time()
     entry_point = Path.cwd().parent # eventually clean up this weird path thing
     
-    BatchSim = BatchProcessor(1, 20)
+    BatchSim = BatchProcessor(80, 20)
     BatchSim.batch_process(entry_point) 
 
     print(f"Total batch sim time: {round(time.time() - start, 2)} seconds")
@@ -73,6 +73,13 @@ def test_model():
     model_save_path = "video_conv3d.pth"
     data_path = "test_data"
     test(model_save_path, data_path, entry_point = Path.cwd().parent)
+
+    playback_file = "real.npy"
+    recording = Recording()
+    recording.init_from_file(playback_file)
+
+    player = SimulationPlayer(800, 800)
+    player.play(recording)
 
 
 if __name__ == "__main__":

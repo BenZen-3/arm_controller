@@ -88,6 +88,7 @@ def train_model(model, dataloader, device, num_epochs=10, learning_rate=0.001):
         model.to(device)
 
         counter = 0 # switch to enumerate probs
+        old_percent = -1
         for inputs, targets in dataloader:
             # Move data to device if applicable
             inputs, targets = inputs, targets.unsqueeze(1)  # Add channel dimension to targets
@@ -106,8 +107,12 @@ def train_model(model, dataloader, device, num_epochs=10, learning_rate=0.001):
             running_loss += loss.item()
             # print(running_loss)
 
-            counter +=1
-            print(f"progress is {round(counter/len(dataloader)*100)}%")
+            # garbo past here
+            counter += 1
+            percent = round(counter / len(dataloader) * 100)
+            if percent != old_percent:
+                print(f"Progress: {percent}%")
+                old_percent = percent
 
         print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(dataloader):.4f}")
 
@@ -126,15 +131,21 @@ def test_model(model, test_loader, device):
     """Run inference on the test dataset."""
     model.eval()
     predictions = []
+    
     with torch.no_grad():
+        old_percent = -1
         counter = 0
         for inputs, _ in test_loader:
             inputs = inputs.to(device)
             outputs = model(inputs)  # Shape: (batch_size, 1, 82, 82)
             predictions.append(outputs.squeeze(1).cpu().numpy())  # Remove channel dim: (batch_size, 82, 82)
             
+            # garbo past here
             counter += 1
-            print(f"Progress: {round(counter / len(test_loader) * 100)}%")
+            percent = round(counter / len(test_loader) * 100)
+            if percent != old_percent:
+                print(f"Progress: {percent}%")
+                old_percent = percent
     
     # Flatten the predictions into a single array
     predictions = np.concatenate(predictions, axis=0)  # Shape: (total_frames, 82, 82)
@@ -156,7 +167,7 @@ def train(entry_point):
     print('made model')
 
     # Train the model
-    train_model(model, dataloader, device, num_epochs=2, learning_rate=0.001)
+    train_model(model, dataloader, device, num_epochs=5, learning_rate=0.001)
     print('trained model')
 
     # Save the model

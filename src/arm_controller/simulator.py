@@ -175,25 +175,34 @@ class Simulator:
             Returns:
             - List of voxel indices that the ray intersects.
             """
+            
             x0, y0 = start
             x1, y1 = end
+
             # Convert world coordinates to grid indices
             x0_idx = int(x0 // voxel_size)
             y0_idx = int(y0 // voxel_size)
+
             x1_idx = int(x1 // voxel_size)
             y1_idx = int(y1 // voxel_size)
+
             dx = x1 - x0
             dy = y1 - y0
+
             step_x = 1 if dx > 0 else -1
             step_y = 1 if dy > 0 else -1
+
             t_max_x = ((x0_idx + (step_x > 0)) * voxel_size - x0) / dx if dx != 0 else float('inf')
             t_max_y = ((y0_idx + (step_y > 0)) * voxel_size - y0) / dy if dy != 0 else float('inf')
             t_delta_x = voxel_size / abs(dx) if dx != 0 else float('inf')
             t_delta_y = voxel_size / abs(dy) if dy != 0 else float('inf')
+
             vox_row = x0_idx
             vox_col = y0_idx
+
             max_ray_len = math.sqrt(dx**2 + dy**2)
             collided_voxels = []
+
             # DDA Traversal Loop
             while True:
                 # Check if within bounds
@@ -201,10 +210,12 @@ class Simulator:
                     collided_voxels.append((vox_col, vox_row))
                 else:
                     break  # Exit if the ray goes out of bounds
+
                 # Calculate ray length and exit if it exceeds maximum
                 ray_len = math.sqrt((vox_row * voxel_size - x0)**2 + (vox_col * voxel_size - y0)**2)
                 if ray_len > max_ray_len:
                     break
+
                 # Move to the next voxel
                 if t_max_x < t_max_y:
                     t_max_x += t_delta_x
@@ -212,83 +223,8 @@ class Simulator:
                 else:
                     t_max_y += t_delta_y
                     vox_col += step_y
+
             return collided_voxels
-
-    def raycastOLD(self, grid, start, end, voxel_size): # TODO: FIND THE WORKING VERSION
-        """
-        Perform a raycast on a grid of voxels and collect all collisions.
-        Optimized version of the 'fast voxel traversal for ray tracing' algorithm.
-
-        Parameters:
-        - grid: 2D list of Voxel objects.
-        - start: (x0, y0) start point of the ray.
-        - end: (x1, y1) end point of the ray.
-        - voxel_size: Size of each voxel.
-
-        Returns:
-        - List of Voxel objects that the ray intersects.
-        """
-        x0, y0 = start
-        x1, y1 = end
-
-        # Convert world coordinates to grid indices
-        x0_idx = int(x0 // voxel_size)
-        y0_idx = int(y0 // voxel_size)
-        x1_idx = int(x1 // voxel_size)
-        y1_idx = int(y1 // voxel_size)
-
-        dx = x1 - x0
-        dy = y1 - y0
-
-        step_x = 1 if dx > 0 else -1
-        step_y = 1 if dy > 0 else -1
-
-        t_max_x = ((x0_idx + (step_x > 0)) * voxel_size - x0) / dx if dx != 0 else float('inf')
-        t_max_y = ((y0_idx + (step_y > 0)) * voxel_size - y0) / dy if dy != 0 else float('inf')
-
-        t_delta_x = voxel_size / abs(dx) if dx != 0 else float('inf')
-        t_delta_y = voxel_size / abs(dy) if dy != 0 else float('inf')
-
-        vox_row = x0_idx
-        vox_col = y0_idx
-
-
-        max_linear_steps = int(math.sqrt((x1_idx - x0_idx)**2 + (y1_idx - y0_idx)**2)) + 1
-        max_ray_len = math.sqrt(dx**2 + dy**2)
-        row_max = len(grid[0])
-        col_max = len(grid)
-
-        collided_voxels = set()  # Use a set for fast membership checking
-
-        steps = 0
-        # DDA Loop Traversal
-        while True:
-            # Check if within bounds
-            if 0 <= vox_row < row_max and 0 <= vox_col < col_max:
-                vox_ids = (vox_col, vox_row)
-                if vox_ids not in collided_voxels:
-                    collided_voxels.add(vox_ids)
-            else:
-                break  # Stop if outside the grid
-
-            # only calculate with expensive sqrt if linear check fails
-            if steps > max_linear_steps:
-                voxel = (vox_col * self.voxel_size, vox_row * self.voxel_size)
-                ray_len = math.sqrt((voxel[0]-x0)**2 + (voxel[1]-y0)**2)
-                if ray_len > max_ray_len:
-                    break
-
-            # Move to the next voxel
-            if t_max_x < t_max_y:
-                t_max_x += t_delta_x
-                vox_row += step_x
-            else:
-                t_max_y += t_delta_y
-                vox_col += step_y
-
-            steps += 1
-
-        return list(collided_voxels)
 
 
 class BatchProcessor:
@@ -318,7 +254,10 @@ class BatchProcessor:
         Returns:
         - A tuple of (sim_id, recording).
         """
-        arm = Arm(x0=width / 2, y0=height / 2, l1=1, l2=1, m1=1, m2=1, g=-9.8)
+        t1 = np.random.uniform(0, 2*np.pi)
+        t2 = np.random.uniform(0, 2*np.pi)
+
+        arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=-9.8)
         sim = Simulator(width, height, arm, voxel_size)
         recording = sim.run(sim_time)
         if save:
@@ -334,7 +273,7 @@ class BatchProcessor:
         - A dictionary of {simulation_id: recording}.
         """
         results = {}
-        with mp.Pool(processes=mp.cpu_count()) as pool:
+        with mp.Pool(processes=mp.cpu_count()-1) as pool:
             # Prepare simulation arguments
             tasks = [
                 (sim_id, self.sim_time, 4.1, 4.1, 0.05, entry_point)  # Default params for each simulation

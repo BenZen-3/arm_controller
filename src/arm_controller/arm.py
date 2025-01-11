@@ -15,7 +15,7 @@ class Arm():
             self.theta1_dot = theta1_dot
             self.theta2_dot = theta2_dot
 
-    def __init__(self, x0=0, y0=0, l1=1, l2=1, m1=1, m2=1, g=-9.8):
+    def __init__(self, x0=0, y0=0, theta1=0, theta2=0, l1=1, l2=1, m1=1, m2=1, g=-9.8):
         
         # params, not modified 
         self.l1 = l1
@@ -26,7 +26,7 @@ class Arm():
         self.linkage_width = .32
 
         # carry the state in a separate instance for clarity between params and state vars
-        self.state = self.ArmState(x0,y0)
+        self.state = self.ArmState(x0,y0, theta1, theta2)
 
     def dynamics(self):
         """
