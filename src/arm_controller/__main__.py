@@ -1,6 +1,6 @@
 import argparse
 from .simulator import BatchProcessor
-from .learning import  VideoConv3D
+from .learning import  train, test
 import time
 from pathlib import Path
 
@@ -21,8 +21,8 @@ def main():
     parser = argparse.ArgumentParser(description="Arm controller Package")
     parser.add_argument(
         '--mode', 
-        choices=['simulator', 'collect_data', 'train_network'], 
-        default='train_network',
+        choices=['simulator', 'collect_data', 'train_network', 'test_model'], 
+        default='test_model',
         help='Choose which module to run'
     )
     args = parser.parse_args()
@@ -34,6 +34,8 @@ def main():
         data_collection_mode()
     elif args.mode == 'train_network':
         train_network()
+    elif args.mode == 'test_model':
+        test_model()
 
 def simulator_mode():
     print("Simulator mode")
@@ -74,8 +76,15 @@ def train_network():
     print("Train Network mode")
     entry_point = Path.cwd().parent # eventually clean up this weird path thing
 
-    model = VideoConv3D()
-    model.load_recordings(entry_point)
+    train(entry_point)
+
+def test_model():
+    print("testing model")
+
+    save_path = "video_conv3d.pth"
+    data = 
+    test(save_path, data)
+
 
 if __name__ == "__main__":
     main()
