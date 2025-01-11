@@ -6,9 +6,7 @@ import numpy as np
 
 class VideoDataset(Dataset):
 
-    data_path = "data"
-
-    def __init__(self, device, recordings=None, num_frames=10, entry_point=None):
+    def __init__(self, device, recordings=None, num_frames=10, entry_point=None, data_path = "data"):
         """
         recordings: List of numpy arrays, each with shape (n, 82, 82) or None
         num_frames: Number of frames to use as input for prediction
@@ -19,6 +17,7 @@ class VideoDataset(Dataset):
         self.num_frames = num_frames
         self.data = []
         self.labels = []
+        self.data_path = data_path
 
         # Load recordings if none are provided
         if not recordings:
@@ -119,7 +118,7 @@ def save_model(model, path):
 def load_model(path, input_channels=1, output_channels=1, device="cpu"):
     """Load the model from the specified path."""
     model = VideoConv3D(input_channels=input_channels, output_channels=output_channels)
-    model.load_state_dict(torch.load(path, map_location=device))
+    model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
     model.to(device)
     return model
 
@@ -128,12 +127,18 @@ def test_model(model, test_loader, device):
     model.eval()
     predictions = []
     with torch.no_grad():
+        counter = 0
         for inputs, _ in test_loader:
             inputs = inputs.to(device)
-            outputs = model(inputs)
-            predictions.append(outputs.cpu().numpy())
+            outputs = model(inputs)  # Shape: (batch_size, 1, 82, 82)
+            predictions.append(outputs.squeeze(1).cpu().numpy())  # Remove channel dim: (batch_size, 82, 82)
+            
+            counter += 1
+            print(f"Progress: {round(counter / len(test_loader) * 100)}%")
+    
+    # Flatten the predictions into a single array
+    predictions = np.concatenate(predictions, axis=0)  # Shape: (total_frames, 82, 82)
     return predictions
-
 def train(entry_point):
 
     # Example data setup
@@ -159,13 +164,23 @@ def train(entry_point):
     save_model(model, save_path)
     print("saved model")
 
-def test(save_path, dataloader):
-
+def test(save_path, data_path, entry_point):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    loaded_model = load_model(save_path, input_channels=1, output_channels=1, device=device)
-    test_predictions = test_model(loaded_model, dataloader, device)
 
+    dataset = VideoDataset(device, num_frames=10, entry_point=entry_point, data_path = data_path)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+
+    loaded_model = load_model(save_path, input_channels=1, output_channels=1, device=device)
+    print('loaded model')
+    test_predictions = test_model(loaded_model, dataloader, device)
+    print(test_predictions)
+
+    save_path = "real"
+    np.save(save_path, test_predictions)
+    print(np.shape(test_predictions))
+
+    return test_predictions
 
 
 if __name__ == "__main__":

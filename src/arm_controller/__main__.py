@@ -1,12 +1,15 @@
 import argparse
-from .simulator import BatchProcessor
+from .simulator import BatchProcessor, Recording
 from .learning import  train, test
+from .player import SimulationPlayer
 import time
 from pathlib import Path
-
-
 import cProfile
 import pstats
+import os
+
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+
 
 def profile_func(func, *args):
     with cProfile.Profile() as pr:
@@ -21,59 +24,45 @@ def main():
     parser = argparse.ArgumentParser(description="Arm controller Package")
     parser.add_argument(
         '--mode', 
-        choices=['simulator', 'collect_data', 'train_network', 'test_model'], 
+        choices=['simulator', 'generator', 'trainer', 'tester'], 
         default='test_model',
         help='Choose which module to run'
-    )
+    ) # simulator, generator, trainer, tester
     args = parser.parse_args()
     
     if args.mode == 'simulator':
         simulator_mode()
-
-    elif args.mode == 'collect_data':
-        data_collection_mode()
-    elif args.mode == 'train_network':
-        train_network()
-    elif args.mode == 'test_model':
+    elif args.mode == 'generator':
+        data_generator_mode()
+    elif args.mode == 'trainer':
+        train_model()
+    elif args.mode == 'tester':
         test_model()
 
 def simulator_mode():
     print("Simulator mode")
 
-    # # units of meters
-    # width = 4.1
-    # height = 4.1
+    # _, recording = BatchProcessor.run_single_simulation(999,10,save=False)
 
-    # arm = Arm(x0=width/2, y0=height/2, l1=1, l2=1, m1=1, m2=1, g=-9.8)
-    # sim = Simulator(width, height, arm, voxel_size=.05)
-    # print('starting')
-    # start = time.time()
-    # recording = sim.run(100)
-    # # profile_func(sim.run, 100)
-    # print("done recording")
-    # print(time.time() - start)
+    playback_file = "real.npy"
+    # playback_file = "7_simulation_data_2025-01-11_06_51_42.npy"
+    recording = Recording()
+    recording.init_from_file(playback_file)
+    player = SimulationPlayer(800, 800)
+    player.play(recording)
 
-    # player = SimulationPlayer(800, 800)
-    # player.play(recording)
-
-    start = time.time()
-    BatchSim = BatchProcessor(40, 20)
-    results = BatchSim.batch_process()
-    # print(results)
-    print(time.time() - start)
-
-def data_collection_mode():
+def data_generator_mode():
     print("Data Collection mode")
     start = time.time()
     entry_point = Path.cwd().parent # eventually clean up this weird path thing
     
-    BatchSim = BatchProcessor(10, 10)
+    BatchSim = BatchProcessor(1, 20)
     BatchSim.batch_process(entry_point) 
 
     print(f"Total batch sim time: {round(time.time() - start, 2)} seconds")
 
-def train_network():
-    print("Train Network mode")
+def train_model():
+    print("Training model mode")
     entry_point = Path.cwd().parent # eventually clean up this weird path thing
 
     train(entry_point)
@@ -81,9 +70,9 @@ def train_network():
 def test_model():
     print("testing model")
 
-    save_path = "video_conv3d.pth"
-    data = 
-    test(save_path, data)
+    model_save_path = "video_conv3d.pth"
+    data_path = "test_data"
+    test(model_save_path, data_path, entry_point = Path.cwd().parent)
 
 
 if __name__ == "__main__":

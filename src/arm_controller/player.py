@@ -1,17 +1,13 @@
 import pygame
-import os
 import time
-from . import Recording, VoxelState
-
+from .simulator import Recording, VoxelState
+import numpy as np
 
 WHITE =     (255, 255, 255)
 BLUE =      (  0,   0, 255)
 GREEN =     (  0, 255,   0)
 RED =       (255,   0,   0)
 BLACK =     (0 ,    0,   0)
-
-
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 class SimulationPlayer:
     
@@ -28,41 +24,50 @@ class SimulationPlayer:
         play a recording of a simulation
         """
 
+        self.setup_to_play(recording)
+
         frame_time = 1/recording.fps
         self.running = True
 
-        for frame in recording.frame_sequence:#voxel_sequence:
-            # print(type(frame))
+        for frame in recording.frame_sequence:
 
             frame_start = time.time()
 
             self.check_quit()
-            # self.draw_frame(frame)
-            Recording.frame_printer(frame)
+            self.draw_frame(frame)
+            # Recording.frame_printer(frame)
 
             time_taken = time.time() - frame_start
             pause_time = frame_time - time_taken
             if pause_time > 0:
-                # time.sleep(frame_time - time_taken)
-                pass
-            else:
-                print("WAAAAAAAAAAA")
+                time.sleep(frame_time - time_taken)
 
             if not self.running: # probably go back to a while(self.running) later
                 break
 
         pygame.quit()
 
-    def draw_frame(self, frame): # TODO: This doesnt work at all
+    def setup_to_play(self, recording):
+        """
+        setup
+        """
+        size = np.shape(recording.frame_sequence)
+        num_vox_width = size[1]
+        num_vox_height = size[2]
+        self.voxel_size = min(self.width // num_vox_width, self.height // num_vox_height)
 
-        # print(np.shape(frame))
-        
-        for voxel_row in frame:
-            for voxel in voxel_row:
-                if voxel.state != VoxelState.NO_FILL:
-                    voxel.draw(self.screen)
-                    # Voxel.draw_cell_value(voxel, self.screen)
-                    # voxel.draw(self.screen)
+
+
+    def draw_frame(self, frame):
+
+        for vox_id_vert, voxel_row in enumerate(frame):
+            for vox_id_hor, voxel in enumerate(voxel_row):
+                if round(voxel) != VoxelState.NO_FILL.value:
+
+                    left = vox_id_hor * self.voxel_size
+                    top = (vox_id_vert + 1) * self.voxel_size
+                    rect = pygame.Rect(left, top, self.voxel_size, self.voxel_size)
+                    pygame.draw.rect(self.screen, WHITE, rect)               
 
         # pygame stuff
         pygame.display.flip()
