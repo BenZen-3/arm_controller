@@ -39,10 +39,11 @@ class SimulationPlayer:
             self.draw_frame(frame)
             # Recording.frame_printer(frame)
 
-            time_taken = time.time() - frame_start
-            pause_time = frame_time - time_taken
-            if pause_time > 0:
-                time.sleep(frame_time - time_taken)
+            time.sleep(.1)
+            # time_taken = time.time() - frame_start
+            # pause_time = frame_time - time_taken
+            # if pause_time > 0:
+            #     time.sleep(frame_time - time_taken)
 
             if not self.running: # probably go back to a while(self.running) later
                 break
@@ -64,16 +65,26 @@ class SimulationPlayer:
 
         for vox_id_vert, voxel_row in enumerate(frame):
             for vox_id_hor, voxel in enumerate(voxel_row):
-                if round(voxel) != VoxelState.NO_FILL.value:
+                # if round(voxel) != VoxelState.NO_FILL.value:
+                if voxel > .2:
 
                     left = vox_id_hor * self.voxel_size
                     top = (vox_id_vert + 1) * self.voxel_size
                     rect = pygame.Rect(left, top, self.voxel_size, self.voxel_size)
-                    pygame.draw.rect(self.screen, WHITE, rect)               
+                    color = self.voxel_color(WHITE, voxel)
+                    pygame.draw.rect(self.screen, color, rect)#WHITE*voxel, rect)               
 
         # pygame stuff
         pygame.display.flip()
         self.screen.fill(BLACK)
+
+    def voxel_color(self, original_color, voxel_val):
+        r, g, b = iter(original_color)
+        r = max(0, min(255, round(r * voxel_val))) # this is UGLY
+        g = max(0, min(255, round(g * voxel_val)))
+        b = max(0, min(255, round(b * voxel_val)))
+        return (r,g,b)
+
 
     def check_quit(self):
         """

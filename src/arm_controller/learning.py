@@ -77,6 +77,73 @@ class VideoConv3D(nn.Module):
         return x.squeeze(2)  # Remove the temporal dimension (T=1)
 
 
+def predict_future_framesNEW(model, initial_frames, num_future_frames, device):
+    """
+    Predict a sequence of future frames given an initial set of frames.
+
+    Parameters:
+        model (nn.Module): The trained model.
+        initial_frames (np.ndarray): Initial frames of shape (num_frames, 82, 82).
+        num_future_frames (int): Number of future frames to predict.
+        device (torch.device): The device to run the model on.
+
+    Returns:
+        np.ndarray: Predicted future frames of shape (num_future_frames, 82, 82).
+    """
+    model.eval()  # Set model to evaluation mode
+    # num_frames = initial_frames.shape[0]  # Number of input frames
+
+    # Prepare initial input tensor
+    input_frames = torch.tensor(initial_frames, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
+    # Shape: (1, 1, num_frames, 82, 82)
+
+    predicted_frames = initial_frames
+
+    with torch.no_grad():
+        for _ in range(num_future_frames):
+            # Predict the next frame
+            output_frame = model(input_frames)  # Output shape: (1, 1, 82, 82)
+            next_frame = output_frame.squeeze(0).squeeze(0).cpu().numpy()  # Shape: (82, 82)
+
+            predicted_frames.append(next_frame)
+
+            # Update input by removing the oldest frame and appending the new one
+            next_frame_tensor = torch.tensor(next_frame, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0).unsqueeze(2)
+            input_frames = torch.cat((input_frames[:, :, 1:, :, :], next_frame_tensor), dim=2)
+
+    return np.array(predicted_frames)  # Shape: (num_future_frames, 82, 82)
+
+
+
+def predict_future_frames(model, initial_frames, num_future_frames, device):
+    """
+    Predict a sequence of future frames given an initial set of frames.
+
+    Parameters:
+        model (nn.Module): The trained model.
+        initial_frames (np.ndarray): Initial frames of shape (num_frames, 82, 82).
+        num_future_frames (int): Number of future frames to predict.
+        device (torch.device): The device to run the model on.
+
+    Returns:
+        np.ndarray: Predicted future frames of shape (num_future_frames, 82, 82).
+    """
+    model.eval()
+    initial_frames = torch.tensor(initial_frames, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, num_frames, 82, 82)
+    predicted_frames = []
+
+    with torch.no_grad():
+        for _ in range(num_future_frames):
+            # Predict the next frame
+            next_frame = model(initial_frames)
+            next_frame = next_frame.squeeze(0).squeeze(0).cpu().numpy()  # Shape: (82, 82)
+            predicted_frames.append(next_frame)
+
+            # Update the input by removing the oldest frame and adding the predicted frame
+            initial_frames = torch.cat((initial_frames[:, :, 1:, :, :], torch.tensor(next_frame, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0).unsqueeze(2)), dim=2)
+
+    return np.array(predicted_frames)
+
 def train_model(model, dataloader, device, num_epochs=10, learning_rate=0.001):
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -150,6 +217,7 @@ def test_model(model, test_loader, device):
     # Flatten the predictions into a single array
     predictions = np.concatenate(predictions, axis=0)  # Shape: (total_frames, 82, 82)
     return predictions
+
 def train(entry_point):
 
     # Example data setup
@@ -192,6 +260,14 @@ def test(save_path, data_path, entry_point):
     print(np.shape(test_predictions))
 
     return test_predictions
+
+def full_prediction(save_path, initial_frames, num_future_frames=100*60):
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = load_model(save_path, input_channels=1, output_channels=1, device=device)
+    print("loaded model")
+
+    return predict_future_frames(model, initial_frames, num_future_frames, device)
 
 
 if __name__ == "__main__":

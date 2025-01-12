@@ -90,7 +90,7 @@ class Simulator:
 
         # simulation init
         self.running = False
-        self.fps = 100
+        self.fps = 10
         self.voxel_size = voxel_size # in meters
 
         self.check_conditions()

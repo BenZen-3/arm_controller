@@ -1,12 +1,13 @@
 import argparse
 from .simulator import BatchProcessor, Recording
-from .learning import  train, test
+from .learning import  train, test, full_prediction
 from .player import SimulationPlayer
 import time
 from pathlib import Path
 import cProfile
 import pstats
 import os
+import numpy as np
 
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
@@ -24,7 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description="Arm controller Package")
     parser.add_argument(
         '--mode', 
-        choices=['simulator', 'generator', 'trainer', 'tester'], 
+        choices=['simulator', 'generator', 'trainer', 'tester', 'predictor'], 
         default='test_model',
         help='Choose which module to run'
     ) # simulator, generator, trainer, tester
@@ -38,6 +39,8 @@ def main():
         train_model()
     elif args.mode == 'tester':
         test_model()
+    elif args.mode == 'predictor':
+        predict()
 
 def simulator_mode():
     print("Simulator mode")
@@ -56,7 +59,7 @@ def data_generator_mode():
     start = time.time()
     entry_point = Path.cwd().parent # eventually clean up this weird path thing
     
-    BatchSim = BatchProcessor(80, 20)
+    BatchSim = BatchProcessor(200, 20)
     BatchSim.batch_process(entry_point) 
 
     print(f"Total batch sim time: {round(time.time() - start, 2)} seconds")
@@ -80,6 +83,31 @@ def test_model():
 
     player = SimulationPlayer(800, 800)
     player.play(recording)
+
+def predict():
+    print("predicting future frames")
+
+    _, recording = BatchProcessor.run_single_simulation(999,10,save=False)
+
+    model_save_path = "video_conv3d.pth"
+    initial_frames = recording.frame_sequence[:10]
+    print(np.shape(initial_frames))
+    frames = full_prediction(model_save_path, initial_frames, num_future_frames=100*60)
+
+    # frames = np.append(initial_frames, frames)
+
+    # print(np.shape(frames))
+
+    prediction = Recording()
+    prediction.fps = 100
+    prediction.frame_sequence = frames
+
+    player = SimulationPlayer(800, 800)
+    player.play(prediction)
+
+    # _, recording = BatchProcessor.run_single_simulation(999,1,save=False)
+    # player = SimulationPlayer(800, 800)
+    # player.play(recording)
 
 
 if __name__ == "__main__":
