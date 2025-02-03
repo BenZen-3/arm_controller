@@ -227,7 +227,7 @@ def train(entry_point):
     print(f"Running on {device=}")
 
     dataset = VideoDataset(device, num_frames=10, entry_point=entry_point)
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
     print('made dataset and loader')
 
     # Instantiate the model

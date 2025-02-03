@@ -92,14 +92,11 @@ def predict():
     model_save_path = "video_conv3d.pth"
     initial_frames = recording.frame_sequence[:10]
     print(np.shape(initial_frames))
-    frames = full_prediction(model_save_path, initial_frames, num_future_frames=100*60)
-
+    frames = full_prediction(model_save_path, initial_frames, num_future_frames=100)
     # frames = np.append(initial_frames, frames)
 
-    # print(np.shape(frames))
-
     prediction = Recording()
-    prediction.fps = 100
+    prediction.fps = 10
     prediction.frame_sequence = frames
 
     player = SimulationPlayer(800, 800)

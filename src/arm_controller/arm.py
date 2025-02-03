@@ -1,5 +1,21 @@
 import numpy as np
 
+"""
+musings
+
+voxel reps should be tagged with text description - like a trasformer
+each object should be its own channel of input - up to N channels of input, all tagged with text 
+
+
+
+reason in 2D by taking slices of 3d problems and putting them in 2D
+
+
+
+
+
+"""
+
 class Arm():
 
     class ArmState:
