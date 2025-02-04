@@ -29,7 +29,6 @@ class VideoDataset(Dataset):
                 self.data.append(rec[i:i + num_frames])
                 self.labels.append(rec[i + num_frames])
 
-
     def load_recordings(self, path):
         """
         Load .npy files from the specified directory.

@@ -39,7 +39,7 @@ class SimulationPlayer:
             self.draw_frame(frame)
             # Recording.frame_printer(frame)
 
-            time.sleep(.1)
+            time.sleep(2)
             # time_taken = time.time() - frame_start
             # pause_time = frame_time - time_taken
             # if pause_time > 0:
