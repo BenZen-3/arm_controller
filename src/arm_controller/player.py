@@ -2,6 +2,7 @@ import pygame
 import time
 from .simulator import Recording, VoxelState
 import numpy as np
+import os
 
 WHITE =     (255, 255, 255)
 BLUE =      (  0,   0, 255)

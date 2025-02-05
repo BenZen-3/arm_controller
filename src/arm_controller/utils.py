@@ -1,4 +1,7 @@
 from datetime import datetime
+import os
+import cProfile
+import pstats
 
 ENTRY_POINT = None
 DATA_FOLDER = "data" # Holy god this should be a pathlike object
@@ -30,3 +33,24 @@ def get_data_folder():
     global ENTRY_POINT, DATA_FOLDER
     return ENTRY_POINT.joinpath(DATA_FOLDER)
 
+def clear_old_data():
+    """
+    clear old data from data folder
+    """
+
+    for sim_data_path in get_data_folder().iterdir():
+        if sim_data_path.is_file() and sim_data_path.suffix == ".npz":
+            os.remove(sim_data_path)
+
+def profile_func(func, *args):
+    """
+    profiler
+    """
+
+    with cProfile.Profile() as pr:
+        func(*args)
+
+    stats = pstats.Stats(pr)
+    stats.sort_stats(pstats.SortKey.TIME)
+
+    stats.print_stats()

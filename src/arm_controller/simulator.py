@@ -20,15 +20,15 @@ class Recording:
 
     output_folder = "data"
 
-    def __init__(self, source = 'simulation'):
+    def __init__(self):
+        """
+        init a recording
+        """
         
         self.frame_sequence = []
-        self.metadata = {'source': '', 'date': '', 'frame_width': '', 
-                         'frame_height': '', 'voxel_size': '', 'fps': '', 
-                         'arm_L1': '', 'arm_L2': '', 'arm_M1': '', 
-                         'arm_M2': ''}
-        self.source = source
-
+        self.metadata = {'date': '', 'frame_width': '', 'frame_height': '', 
+                         'voxel_size': '', 'fps': '', 'arm_L1': '', 
+                         'arm_L2': '', 'arm_M1': '', 'arm_M2': ''}
 
     def init_from_file(self, path):
         """
@@ -36,8 +36,12 @@ class Recording:
         """
         
         loaded_data = np.load(path, allow_pickle=True)
-        self.frame_sequence  = loaded_data['array_data']
-        self.metadata = loaded_data['metadata'].item()
+        metadata = loaded_data['metadata'].item()
+        self.frame_sequence  = loaded_data['arr_0']
+        
+        # add metadata to the dict
+        for key, value in metadata.items():
+            self.metadata[key] = value
 
     def init_for_recording(self, frame_width, frame_height, voxel_size, fps, arm, name=None):
 
@@ -57,7 +61,6 @@ class Recording:
         saves the metadata in the dict
         """
 
-        self.metadata['source'] = self.source
         self.metadata['date'] = str(self.date)
         self.metadata['frame_width'] = self.frame_width
         self.metadata['frame_height'] = self.frame_height
