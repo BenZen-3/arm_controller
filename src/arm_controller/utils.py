@@ -4,7 +4,8 @@ import cProfile
 import pstats
 
 ENTRY_POINT = None
-DATA_FOLDER = "data" # Holy god this should be a pathlike object
+DATA_FOLDER = "data/sim_data" # Holy god this should be a pathlike object
+MODEL_FOLDER = "data/model_data" # this too
 
 def pretty_date():
     """
@@ -42,6 +43,19 @@ def clear_old_data():
         if sim_data_path.is_file() and sim_data_path.suffix == ".npz":
             os.remove(sim_data_path)
 
+def clear_old_model():
+    """
+    delete the old model
+    """
+    print("clear_old_data NOT IMPLEMENTED")
+
+def get_model_folder():
+    """
+    get the folder that the model is supposed to live in
+    """
+    global ENTRY_POINT, MODEL_FOLDER
+    return ENTRY_POINT.joinpath(MODEL_FOLDER)
+
 def profile_func(func, *args):
     """
     profiler
@@ -52,5 +66,4 @@ def profile_func(func, *args):
 
     stats = pstats.Stats(pr)
     stats.sort_stats(pstats.SortKey.TIME)
-
     stats.print_stats()

@@ -12,8 +12,8 @@ class VoxelState(Enum):
     state of the voxel
     """
     NO_FILL = 0
-    FILLED_ARM = 1
-    FILLED_OBSTACLE = 2
+    FILLED_ARM = 255
+    # FILLED_OBSTACLE = 2
 
 
 class Recording:
@@ -42,6 +42,12 @@ class Recording:
         # add metadata to the dict
         for key, value in metadata.items():
             self.metadata[key] = value
+
+        self.date = self.metadata['date']
+        self.frame_width = self.metadata['frame_width']
+        self.frame_height = self.metadata['frame_height']
+        self.voxel_size = self.metadata['voxel_size']
+        self.fps = self.metadata['fps']
 
     def init_for_recording(self, frame_width, frame_height, voxel_size, fps, arm, name=None):
 
@@ -142,7 +148,7 @@ class Simulator:
 
         num_hor_vox = int(Decimal(str(self.width)) // Decimal(str(self.voxel_size)))
         num_vert_vox = int(Decimal(str(self.height)) // Decimal(str(self.voxel_size)))
-        self.voxels = np.ones([num_hor_vox, num_vert_vox], dtype=np.uint8) * VoxelState.NO_FILL.value # TODO: I CHANGED TO A UINT8, BUT THE VALUES NOW NEED TO BE 0 - 255 INSTEAD OF FLOATS
+        self.voxels = np.ones([num_hor_vox, num_vert_vox], dtype=np.uint8) * VoxelState.NO_FILL.value
 
     def run(self, sim_time=10):
         """

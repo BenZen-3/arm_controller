@@ -38,13 +38,11 @@ class SimulationPlayer:
 
             self.check_quit()
             self.draw_frame(frame)
-            # Recording.frame_printer(frame)
 
-            time.sleep(2)
-            # time_taken = time.time() - frame_start
-            # pause_time = frame_time - time_taken
-            # if pause_time > 0:
-            #     time.sleep(frame_time - time_taken)
+            time_taken = time.time() - frame_start
+            pause_time = frame_time - time_taken
+            if pause_time > 0:
+                time.sleep(frame_time - time_taken)
 
             if not self.running: # probably go back to a while(self.running) later
                 break
@@ -60,8 +58,6 @@ class SimulationPlayer:
         num_vox_height = size[2]
         self.voxel_size = min(self.width // num_vox_width, self.height // num_vox_height)
 
-
-
     def draw_frame(self, frame):
 
         for vox_id_vert, voxel_row in enumerate(frame):
@@ -73,7 +69,7 @@ class SimulationPlayer:
                     top = (vox_id_vert + 1) * self.voxel_size
                     rect = pygame.Rect(left, top, self.voxel_size, self.voxel_size)
                     color = self.voxel_color(WHITE, voxel)
-                    pygame.draw.rect(self.screen, color, rect)#WHITE*voxel, rect)               
+                    pygame.draw.rect(self.screen, color, rect)             
 
         # pygame stuff
         pygame.display.flip()

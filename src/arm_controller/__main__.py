@@ -2,12 +2,11 @@ import argparse
 import time
 from pathlib import Path
 import os
-import numpy as np
 
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 from .simulator import BatchProcessor, Recording
-from .learning import  train, test, full_prediction
+from .learning import  main_train
 from .player import SimulationPlayer
 from . import utils
 
@@ -19,7 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description="Arm controller Package")
     parser.add_argument(
         '--mode', 
-        choices=['generator', 'trainer', 'predictor'], 
+        choices=['generator', 'trainer', 'predictor', 'playback'], 
         default='generator',
         help='Choose which module to run. Generate data, train on data, or predict a sequence from a random starting state'
     )
@@ -33,6 +32,9 @@ def main():
         train_model()
     elif args.mode == 'predictor':
         predict()
+    elif args.mode == 'playback':
+        playback_recording()
+        
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
@@ -57,10 +59,12 @@ def train_model(clear_old_model=True):
     
     params here
     """
-    print("Training model mode")
+    print("Training model")
 
-    if clear_old_model and input("Clear Previous Model? \"Y\" to clear. Enter to continue. ") == "Y":
-        utils.clear_old_model()
+    main_train()
+
+    # if clear_old_model and input("Clear Previous Model? \"Y\" to clear. Enter to continue. ") == "Y":
+    #     utils.clear_old_model()
     
 
     # recs = []
@@ -79,39 +83,53 @@ def train_model(clear_old_model=True):
 def test_model():
     print("testing model")
 
-    model_save_path = "video_conv3d.pth"
-    data_path = "test_data"
-    test(model_save_path, data_path, entry_point = Path.cwd().parent)
+    # model_save_path = "video_conv3d.pth"
+    # data_path = "test_data"
+    # test(model_save_path, data_path, entry_point = Path.cwd().parent)
 
-    playback_file = "real.npy"
-    recording = Recording()
-    recording.init_from_file(playback_file)
+    # playback_file = "real.npy"
+    # recording = Recording()
+    # recording.init_from_file(playback_file)
 
-    player = SimulationPlayer(800, 800)
-    player.play(recording)
+    # player = SimulationPlayer(800, 800)
+    # player.play(recording)
 
 def predict():
-    print("predicting future frames")
+    print("Predicting future frames")
 
-    _, recording = BatchProcessor.run_single_simulation(999,10,save=False)
+    # _, recording = BatchProcessor.run_single_simulation(999,10,save=False)
 
-    model_save_path = "video_conv3d.pth"
-    initial_frames = recording.frame_sequence[:10]
-    print(np.shape(initial_frames))
-    frames = full_prediction(model_save_path, initial_frames, num_future_frames=100)
-    # frames = np.append(initial_frames, frames)
+    # model_save_path = "video_conv3d.pth"
+    # initial_frames = recording.frame_sequence[:10]
+    # print(np.shape(initial_frames))
+    # frames = full_prediction(model_save_path, initial_frames, num_future_frames=100)
+    # # frames = np.append(initial_frames, frames)
 
-    prediction = Recording()
-    prediction.fps = 10
-    prediction.frame_sequence = frames
+    # prediction = Recording()
+    # prediction.fps = 10
+    # prediction.frame_sequence = frames
 
-    player = SimulationPlayer(800, 800)
-    player.play(prediction)
+    # player = SimulationPlayer(800, 800)
+    # player.play(prediction)
 
     # _, recording = BatchProcessor.run_single_simulation(999,1,save=False)
     # player = SimulationPlayer(800, 800)
     # player.play(recording)
 
+def playback_recording(rec_num=0):
+    print("Playing recording")
+
+    recs = []
+    for sim_data_path in utils.get_data_folder().iterdir():
+        if sim_data_path.is_file() and sim_data_path.suffix == ".npz":
+            rec = Recording()
+            rec.init_from_file(sim_data_path)
+            recs.append(rec)
+
+    play_me = recs[rec_num]
+
+    player = SimulationPlayer(800, 800)
+    player.play(play_me)
 
 if __name__ == "__main__":
 
