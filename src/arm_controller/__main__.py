@@ -47,7 +47,7 @@ def generate_data(num_sims=100, sim_time=50, clear_prev_data=True):
     sim_time is the length of the simulation
     """
 
-    if clear_prev_data and input("Clear Previous Data? \"N\" to stop. Enter to continue. ") != "N":
+    if clear_prev_data and input("Clearing Previous Data. \"N\" to stop. Enter to continue. ") != "N":
         utils.clear_old_data()
     
     print("Generating data")
@@ -70,12 +70,12 @@ def predict():
     print(np.shape(recording.frame_sequence))
 
     predicted_frames = main_predict(recording.get_float_frame_seq(), 1000)
-    print(np.size(recording.get_float_frame_seq()))
-    # recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames))
+    # print(np.size(recording.get_float_frame_seq()))
+    recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames))
     #recording._frame_sequence = predicted_frames[0:1] #
-    recording._frame_sequence = predicted_frames # TODO: super jank, but saves the fps data soooo who cares for now
+    # recording._frame_sequence = predicted_frames # TODO: super jank, but saves the fps data soooo who cares for now
 
-    recording.fps = .001
+    # recording.fps = .001
 
     player = SimulationPlayer(800, 800)
     player.play(recording)

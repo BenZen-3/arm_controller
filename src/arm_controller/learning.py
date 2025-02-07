@@ -9,7 +9,6 @@ from os import listdir
 from torch.cuda.amp import autocast, GradScaler
 
 
-
 class VideoDataset(Dataset):
     """
     A dataset class for handling video recordings and preparing input-output pairs
@@ -52,6 +51,9 @@ class VideoDataset(Dataset):
         for num, rec in enumerate(self.recordings):
             print(f"loaded {num+1}/{len(self.recordings)} recordings")
             frame_seq = rec.get_float_frame_seq()
+            # print(type(frame_seq[0][0][0]))
+            # print(np.max(frame_seq))
+            # print(np.count_nonzero(frame_seq > 0))
             # frame_seq = rec.frame_sequence.astype(np.float32) / 255.0 # TODO: Check the datatype and divide by datatype max instead...
             for i in range(len(frame_seq) - self.num_frames):
                 self.data.append(frame_seq[i:i + self.num_frames])
@@ -79,19 +81,22 @@ class VideoConv3D(nn.Module):
         """
         super().__init__()
         self.device = device
+
+        # 3D Convolutional layers
         self.encoder = nn.Sequential(
-            nn.Conv3d(input_channels, 16, kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(input_channels, 16, kernel_size=(3, 3, 3), stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv3d(16, 32, kernel_size=3, stride=1, padding=1),
-            nn.ReLU()
+            nn.Conv3d(16, 32, kernel_size=(3, 3, 3), stride=1, padding=1),
+            nn.ReLU(),
         )
+        
         self.decoder = nn.Sequential(
-            nn.Conv3d(32, 16, kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(32, 16, kernel_size=(3, 3, 3), stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv3d(16, output_channels, kernel_size=(num_frames, 3, 3),
-                      stride=(num_frames, 1, 1), padding=(0, 1, 1))
+            nn.Conv3d(16, output_channels, kernel_size=(num_frames, 3, 3), stride=(num_frames, 1, 1), padding=(0, 1, 1)),
         )
-        self.criterion = nn.L1Loss() # self.criterion = nn.MSELoss()
+
+        self.criterion = nn.MSELoss()
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         self.to(device)
 
@@ -106,8 +111,6 @@ class VideoConv3D(nn.Module):
         Trains the model using the given dataset and optimizer.
         """
 
-        print(len(dataloader))
-
         for epoch in range(num_epochs):
             self.train()
             running_loss = 0.0
@@ -116,19 +119,26 @@ class VideoConv3D(nn.Module):
             old_percent = -1
 
             for inputs, targets in dataloader:
+                # Move data to device if applicable
+                inputs, targets = inputs, targets.unsqueeze(1)  # Add channel dimension to targets
+
+                # Zero the parameter gradients
                 self.optimizer.zero_grad()
 
-                with torch.autocast(device_type="cuda"):
-                    outputs = self(inputs)
-                    loss = self.criterion(outputs, targets.unsqueeze(1))
+                # Forward pass
+                outputs = self(inputs)
+                loss = self.criterion(outputs, targets)
 
-                # outputs = self(inputs)
-                # loss = self.criterion(outputs, targets.unsqueeze(1))
+                # with torch.autocast(device_type="cuda"):
+                #     outputs = self(inputs)
+                #     loss = self.criterion(outputs, targets)
 
-
+                # Backward pass and optimize
                 loss.backward()
                 self.optimizer.step()
+
                 running_loss += loss.item()
+                # print(running_loss)
 
                 # garbo past here
                 counter += 1
@@ -136,6 +146,27 @@ class VideoConv3D(nn.Module):
                 if percent != old_percent:
                     print(f"Epoch [{epoch+1}/{num_epochs}] Progress: {percent}%, Loss: {running_loss/counter}")
                     old_percent = percent
+                
+                # self.optimizer.zero_grad()
+
+                # # with torch.autocast(device_type="cuda"):
+                # #     outputs = self(inputs)
+                # #     loss = self.criterion(outputs, targets.unsqueeze(1))
+
+                # outputs = self(inputs)
+                # loss = self.criterion(outputs, targets.unsqueeze(1))
+
+
+                # loss.backward()
+                # self.optimizer.step()
+                # running_loss += loss.item()
+
+                # # garbo past here
+                # counter += 1
+                # percent = round(counter / len(dataloader) * 100)
+                # if percent != old_percent:
+                #     print(f"Epoch [{epoch+1}/{num_epochs}] Progress: {percent}%, Loss: {running_loss/counter}")
+                #     old_percent = percent
 
             print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss / len(dataloader):.8f}")
 
@@ -179,7 +210,7 @@ def main_train():
     Builds the model, prepares the dataset, and trains the model.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = VideoDataset(device, num_frames=30)
+    dataset = VideoDataset(device, num_frames=10)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     model = VideoConv3D(device=device)
@@ -190,14 +221,14 @@ def main_train():
     model.save_model(model_save_path)
 
 
-def main_predict(seed_frames, num_future_frames=30):
+def main_predict(seed_frames, num_future_frames=10):
     """
     Loads a trained model and generates future frames given a seed frame.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model_path = utils.get_most_recent_model()
-    print(model_path)
+    print(f"Running model found at {model_path}")
 
     model = VideoConv3D.load_model(model_path, device=device)
     future_frames = model.predict_future_frames(seed_frames, num_future_frames)
