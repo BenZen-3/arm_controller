@@ -6,6 +6,8 @@ from torch.utils.data import DataLoader, Dataset
 from . import utils
 import numpy as np
 from os import listdir
+from torch.cuda.amp import autocast, GradScaler
+
 
 
 class VideoDataset(Dataset):
@@ -13,7 +15,7 @@ class VideoDataset(Dataset):
     A dataset class for handling video recordings and preparing input-output pairs
     for training and testing deep learning models.
     """
-    def __init__(self, device, recordings=None, num_frames=10):
+    def __init__(self, device, num_frames, recordings=None):
         """
         Initializes the dataset by loading or processing video recordings.
         """
@@ -22,6 +24,7 @@ class VideoDataset(Dataset):
         self.num_frames = num_frames
         self.data = []
         self.labels = []
+        self.max_recordings = 250
 
         if not recordings:
             self.load_recordings()
@@ -32,11 +35,13 @@ class VideoDataset(Dataset):
         """
         Loads recordings from the specified path and stores them in memory.
         """
-        for file in utils.get_data_folder().iterdir():
+        for num, file in enumerate(utils.get_data_folder().iterdir()):
             if file.suffix == ".npz":
                 rec = Recording()
                 rec.init_from_file(file)
                 self.recordings.append(rec)
+
+                if num > self.max_recordings: break # TODO: get more ram for my laptop...
 
     def prepare_data(self):
         """
@@ -44,7 +49,8 @@ class VideoDataset(Dataset):
         Each sample consists of `num_frames` consecutive frames as input
         and the next frame as the label.
         """
-        for rec in self.recordings:
+        for num, rec in enumerate(self.recordings):
+            print(f"loaded {num+1}/{len(self.recordings)} recordings")
             frame_seq = rec.get_float_frame_seq()
             # frame_seq = rec.frame_sequence.astype(np.float32) / 255.0 # TODO: Check the datatype and divide by datatype max instead...
             for i in range(len(frame_seq) - self.num_frames):
@@ -85,7 +91,7 @@ class VideoConv3D(nn.Module):
             nn.Conv3d(16, output_channels, kernel_size=(num_frames, 3, 3),
                       stride=(num_frames, 1, 1), padding=(0, 1, 1))
         )
-        self.criterion = nn.MSELoss()
+        self.criterion = nn.L1Loss() # self.criterion = nn.MSELoss()
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         self.to(device)
 
@@ -99,6 +105,9 @@ class VideoConv3D(nn.Module):
         """
         Trains the model using the given dataset and optimizer.
         """
+
+        print(len(dataloader))
+
         for epoch in range(num_epochs):
             self.train()
             running_loss = 0.0
@@ -108,8 +117,15 @@ class VideoConv3D(nn.Module):
 
             for inputs, targets in dataloader:
                 self.optimizer.zero_grad()
-                outputs = self(inputs)
-                loss = self.criterion(outputs, targets.unsqueeze(1))
+
+                with torch.autocast(device_type="cuda"):
+                    outputs = self(inputs)
+                    loss = self.criterion(outputs, targets.unsqueeze(1))
+
+                # outputs = self(inputs)
+                # loss = self.criterion(outputs, targets.unsqueeze(1))
+
+
                 loss.backward()
                 self.optimizer.step()
                 running_loss += loss.item()
@@ -118,10 +134,10 @@ class VideoConv3D(nn.Module):
                 counter += 1
                 percent = round(counter / len(dataloader) * 100)
                 if percent != old_percent:
-                    print(f"Epoch [{epoch+1}/{num_epochs}] Progress: {percent}%")
+                    print(f"Epoch [{epoch+1}/{num_epochs}] Progress: {percent}%, Loss: {running_loss/counter}")
                     old_percent = percent
 
-            print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss / len(dataloader):.4f}")
+            print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss / len(dataloader):.8f}")
 
     def predict_future_frames(self, initial_frames, num_future_frames):
         """
@@ -163,18 +179,18 @@ def main_train():
     Builds the model, prepares the dataset, and trains the model.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = VideoDataset(device, num_frames=10)
+    dataset = VideoDataset(device, num_frames=30)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     model = VideoConv3D(device=device)
     print('started training process')
-    model.train_model(dataloader, num_epochs=1)
+    model.train_model(dataloader, num_epochs=2)
 
     model_save_path = utils.get_model_folder()
     model.save_model(model_save_path)
 
 
-def main_predict(seed_frames, num_future_frames=10):
+def main_predict(seed_frames, num_future_frames=30):
     """
     Loads a trained model and generates future frames given a seed frame.
     """

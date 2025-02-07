@@ -284,8 +284,6 @@ class BatchProcessor:
         - sim_time: Duration of each simulation.
         """
 
-        # print(utils.get_entry_point())
-
         self.num_sims = num_sims
         self.sim_time = sim_time
         self.save_path = utils.get_data_folder()
