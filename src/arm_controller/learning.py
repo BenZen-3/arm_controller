@@ -5,6 +5,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from . import utils
 import numpy as np
+from os import listdir
 
 
 class VideoDataset(Dataset):
@@ -44,7 +45,8 @@ class VideoDataset(Dataset):
         and the next frame as the label.
         """
         for rec in self.recordings:
-            frame_seq = rec.frame_sequence / 255.0 # TODO: Check the datatype and divide by datatype max instead...
+            frame_seq = rec.get_float_frame_seq()
+            # frame_seq = rec.frame_sequence.astype(np.float32) / 255.0 # TODO: Check the datatype and divide by datatype max instead...
             for i in range(len(frame_seq) - self.num_frames):
                 self.data.append(frame_seq[i:i + self.num_frames])
                 self.labels.append(frame_seq[i + self.num_frames])
@@ -100,6 +102,10 @@ class VideoConv3D(nn.Module):
         for epoch in range(num_epochs):
             self.train()
             running_loss = 0.0
+
+            counter = 0 # switch to enumerate probs
+            old_percent = -1
+
             for inputs, targets in dataloader:
                 self.optimizer.zero_grad()
                 outputs = self(inputs)
@@ -107,6 +113,14 @@ class VideoConv3D(nn.Module):
                 loss.backward()
                 self.optimizer.step()
                 running_loss += loss.item()
+
+                # garbo past here
+                counter += 1
+                percent = round(counter / len(dataloader) * 100)
+                if percent != old_percent:
+                    print(f"Epoch [{epoch+1}/{num_epochs}] Progress: {percent}%")
+                    old_percent = percent
+
             print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss / len(dataloader):.4f}")
 
     def predict_future_frames(self, initial_frames, num_future_frames):
@@ -126,15 +140,21 @@ class VideoConv3D(nn.Module):
                      .unsqueeze(0).unsqueeze(0).unsqueeze(2)), dim=2)
         return np.array(predicted_frames)
 
-    def save_model(self, path):
+    def save_model(self, save_folder):
         """Saves the trained model to a specified path."""
-        torch.save(self.state_dict(), path)
+
+        id = len(listdir(save_folder)) # a bit jank considering it also counts the .gitignore
+        name = f"frame_prediction_model_{id}.pth"
+        save_file = save_folder.joinpath(name)
+        print(f"Saved Model as {name}")
+
+        torch.save(self.state_dict(), save_file)
 
     @staticmethod
     def load_model(path, input_channels=1, output_channels=1, num_frames=10, device="cpu"):
         """Loads a saved model from disk."""
         model = VideoConv3D(input_channels, output_channels, num_frames, device)
-        model.load_state_dict(torch.load(path, map_location=device))
+        model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
         return model.to(device)
 
 
@@ -145,12 +165,27 @@ def main_train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = VideoDataset(device, num_frames=10)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+
     model = VideoConv3D(device=device)
     print('started training process')
     model.train_model(dataloader, num_epochs=1)
 
     model_save_path = utils.get_model_folder()
-    model.save_model("video_conv3d.pth", model_save_path)
+    model.save_model(model_save_path)
+
+
+def main_predict(seed_frames, num_future_frames=10):
+    """
+    Loads a trained model and generates future frames given a seed frame.
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model_path = utils.get_most_recent_model()
+    print(model_path)
+
+    model = VideoConv3D.load_model(model_path, device=device)
+    future_frames = model.predict_future_frames(seed_frames, num_future_frames)
+    return future_frames
 
 
 if __name__ == "__main__":

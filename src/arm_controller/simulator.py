@@ -19,13 +19,15 @@ class VoxelState(Enum):
 class Recording:
 
     output_folder = "data"
+    frame_dtype = np.uint8
 
     def __init__(self):
         """
         init a recording
         """
         
-        self.frame_sequence = []
+        # self._frame_sequence = np.empty() # TODO: switch to a numpy array
+        self._frame_sequence = []
         self.metadata = {'date': '', 'frame_width': '', 'frame_height': '', 
                          'voxel_size': '', 'fps': '', 'arm_L1': '', 
                          'arm_L2': '', 'arm_M1': '', 'arm_M2': ''}
@@ -37,7 +39,7 @@ class Recording:
         
         loaded_data = np.load(path, allow_pickle=True)
         metadata = loaded_data['metadata'].item()
-        self.frame_sequence  = loaded_data['arr_0']
+        self._frame_sequence  = loaded_data['arr_0']
         
         # add metadata to the dict
         for key, value in metadata.items():
@@ -81,7 +83,7 @@ class Recording:
         """
         copies the voxel array and appends it to the frame seq
         """
-        self.frame_sequence.append(np.copy(voxel_grid))
+        self._frame_sequence.append(np.copy(voxel_grid))
 
     def save(self, id=0, save_folder=None):
         """
@@ -89,7 +91,22 @@ class Recording:
         """
 
         save_path = save_folder.joinpath(f"{id}_{self.name}")
-        np.savez(save_path, self.frame_sequence, metadata=self.metadata)
+        np.savez(save_path, self._frame_sequence, metadata=self.metadata)
+
+    # TODO: check that this is used properly external to this class... also possiblly remove once np array is used for frame seq
+    @property
+    def frame_sequence(self): 
+        """
+        frame sequence getter. always return array
+        """
+        return np.asarray(self._frame_sequence)
+
+    def get_float_frame_seq(self):
+        """
+        model requires float32. this stores as uint8. output as float32
+        """
+        normalize_factor = np.float32(np.iinfo(self.frame_dtype).max)
+        return self.frame_sequence.astype(np.float32) / normalize_factor
 
     @classmethod
     def frame_printer(self, frame):
@@ -148,7 +165,7 @@ class Simulator:
 
         num_hor_vox = int(Decimal(str(self.width)) // Decimal(str(self.voxel_size)))
         num_vert_vox = int(Decimal(str(self.height)) // Decimal(str(self.voxel_size)))
-        self.voxels = np.ones([num_hor_vox, num_vert_vox], dtype=np.uint8) * VoxelState.NO_FILL.value
+        self.voxels = np.ones([num_hor_vox, num_vert_vox], dtype=Recording.frame_dtype) * VoxelState.NO_FILL.value
 
     def run(self, sim_time=10):
         """

@@ -2,6 +2,7 @@ from datetime import datetime
 import os
 import cProfile
 import pstats
+import re
 
 ENTRY_POINT = None
 DATA_FOLDER = "data/sim_data" # Holy god this should be a pathlike object
@@ -47,7 +48,7 @@ def clear_old_model():
     """
     delete the old model
     """
-    print("clear_old_data NOT IMPLEMENTED")
+    print("clear_old_model NOT IMPLEMENTED")
 
 def get_model_folder():
     """
@@ -55,6 +56,34 @@ def get_model_folder():
     """
     global ENTRY_POINT, MODEL_FOLDER
     return ENTRY_POINT.joinpath(MODEL_FOLDER)
+
+def get_most_recent_model():
+    """
+    returns the path for the most recent model
+    """
+
+    base_name = "frame_prediction_model"
+    pattern = rf"{base_name}_(\d{{1,3}})\.pth"
+
+    most_recent_model = None
+    highest_id = -1
+    for file in get_model_folder().iterdir(): # TODO: yea this is not my best work
+        if file.suffix == ".pth":
+            match_file = re.search(pattern, str(file))
+            
+            if match_file:
+                model_id = int(match_file.group(1)) 
+
+                if model_id > highest_id:
+                    most_recent_model = file
+                    highest_id = model_id
+
+    return most_recent_model
+
+            
+
+
+
 
 def profile_func(func, *args):
     """

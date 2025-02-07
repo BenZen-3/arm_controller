@@ -2,11 +2,12 @@ import argparse
 import time
 from pathlib import Path
 import os
+import numpy as np
 
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 from .simulator import BatchProcessor, Recording
-from .learning import  main_train
+from .learning import  main_train, main_predict
 from .player import SimulationPlayer
 from . import utils
 
@@ -63,41 +64,23 @@ def train_model(clear_old_model=True):
 
     main_train()
 
-    # if clear_old_model and input("Clear Previous Model? \"Y\" to clear. Enter to continue. ") == "Y":
-    #     utils.clear_old_model()
-    
-
-    # recs = []
-    # for sim_data_path in utils.get_data_folder().iterdir():
-    #     if sim_data_path.is_file() and sim_data_path.suffix == ".npz":
-    #         rec = Recording()
-    #         rec.init_from_file(sim_data_path)
-    #         recs.append(rec)
-
-    
-
-    # entry_point = Path.cwd().parent # eventually clean up this weird path thing
-
-    # train(entry_point)
-
-def test_model():
-    print("testing model")
-
-    # model_save_path = "video_conv3d.pth"
-    # data_path = "test_data"
-    # test(model_save_path, data_path, entry_point = Path.cwd().parent)
-
-    # playback_file = "real.npy"
-    # recording = Recording()
-    # recording.init_from_file(playback_file)
-
-    # player = SimulationPlayer(800, 800)
-    # player.play(recording)
-
 def predict():
     print("Predicting future frames")
 
-    # _, recording = BatchProcessor.run_single_simulation(999,10,save=False)
+    _, recording = BatchProcessor.run_single_simulation(0,1)
+
+    predicted_frames = main_predict(recording.get_float_frame_seq(), 1000)
+    print(np.max(recording.get_float_frame_seq()))
+    recording._frame_sequence = predicted_frames[0:1] #np.concatenate((np.copy(recording.frame_sequence), predicted_frames))
+    # recording._frame_sequence = predicted_frames # TODO: super jank, but saves the fps data soooo who cares for now
+
+    recording.fps = 0.001
+
+    player = SimulationPlayer(800, 800)
+    player.play(recording)
+    player.play(recording)
+
+    
 
     # model_save_path = "video_conv3d.pth"
     # initial_frames = recording.frame_sequence[:10]
@@ -116,6 +99,7 @@ def predict():
     # player = SimulationPlayer(800, 800)
     # player.play(recording)
 
+# this is temp and this is trash code
 def playback_recording(rec_num=0):
     print("Playing recording")
 
@@ -127,6 +111,10 @@ def playback_recording(rec_num=0):
             recs.append(rec)
 
     play_me = recs[rec_num]
+
+    print(type(play_me.frame_sequence[0]))
+    import numpy as np
+    print(np.max(play_me.frame_sequence[0]))
 
     player = SimulationPlayer(800, 800)
     player.play(play_me)
