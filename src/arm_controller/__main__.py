@@ -39,7 +39,7 @@ def main():
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
-def generate_data(num_sims=100, sim_time=50, clear_prev_data=True):
+def generate_data(num_sims=100, sim_time=500, clear_prev_data=True):
     """
     generate data for training
 
@@ -71,11 +71,11 @@ def predict():
 
     predicted_frames = main_predict(recording.get_float_frame_seq(), 1000)
     # print(np.size(recording.get_float_frame_seq()))
-    recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames))
-    #recording._frame_sequence = predicted_frames[0:1] #
+    # recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames))
+    recording._frame_sequence = predicted_frames[0:1] #
     # recording._frame_sequence = predicted_frames # TODO: super jank, but saves the fps data soooo who cares for now
 
-    # recording.fps = .001
+    recording.fps = .001
 
     player = SimulationPlayer(800, 800)
     player.play(recording)
