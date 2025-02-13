@@ -51,18 +51,13 @@ class VideoDataset(Dataset):
         and the next frame as the label.
         """
 
-        # num_samples = sum(len(rec.frame_sequence) - self.num_input_frames for rec in self.recordings) - 2*len(self.recordings)
-        # print(num_samples)
-
-        # Preallocate NumPy arrays
-        data_list = [] #np.zeros((num_samples, self.num_input_frames, 82, 82), dtype=np.float32)  # TODO: HARDCODED 82
-        label_list = [] #np.zeros((num_samples, self.num_label_frames, 82, 82), dtype=np.float32)
+        data_list = []
+        label_list = []
 
         index = 0
         for num, rec in enumerate(self.recordings):
             print(f"loaded {num+1}/{len(self.recordings)} recordings")
             frame_seq = rec.get_float_frame_seq()
-            # print(np.shape(frame_seq))
             for i in range(len(frame_seq) - self.num_input_frames - self.num_label_frames):
                 data = np.copy(frame_seq[i:i + self.num_input_frames])
                 label = np.copy(frame_seq[i + self.num_input_frames : i + self.num_input_frames + self.num_label_frames])
@@ -70,115 +65,14 @@ class VideoDataset(Dataset):
                 label_list.append(label)
                 index += 1
 
-        import time
-        start = time.time()
         data_list = np.stack(data_list)
         label_list = np.stack(label_list)
-        print(time.time() - start)
 
         self.data = torch.from_numpy(data_list)
         self.labels = torch.from_numpy(label_list)
 
         print(f"data size: {np.shape(data_list)}")
         print(f"labels size: {np.shape(label_list)}")
-
-        return
-
-                # PREV WORKING
-                # data[index] = np.copy(frame_seq[i:i + self.num_input_frames])
-                # labels[index] = np.copy(frame_seq[i + self.num_input_frames : i + self.num_input_frames + self.num_label_frames])
-                # index += 1
-
-
-
-                # OLD
-                # print(index)
-                # print(f"i:{i}")
-                # print(f"{i + self.num_input_frames} : {i + self.num_input_frames + self.num_label_frames}")
-                # print(f"input {self.num_input_frames}")
-                # print(f"label {self.num_label_frames}")
-                #np.ones((82,82))#np.copy(frame_seq[i + self.num_frames])#:i + 2*self.num_frames]) # 2*_ might be wrong
-                # print(np.shape(labels[index]))
-
-                # frame = labels[index]
-                # print(np.shape(frame))
-                # Recording.frame_printer(frame[0])
-
-                # print(np.max(labels[index]))
-
-        print("WHY SO SLOW")
-
-        print(len(data_list))
-        print(len(label_list))
-
-        data_list = np.stack(data_list)
-        label_list = np.stack(label_list)
-
-        print(f"data size: {np.shape(data_list)}")
-        print(f"labels size: {np.shape(label_list)}")
-
-        # 24945
-        # 24945
-        # data size: (10, 82, 82)
-        # labels size: (1, 82, 82)
-
-        # return
-
-        # data_list = np.concatenate(data_list)
-        # label_list = np.concatenate(label_list)
-
-        # SHOULD GENERATE (24950, 10, 82, 82)
-
-        self.data = torch.from_numpy(data_list)
-        self.labels = torch.from_numpy(label_list)
-
-        print(f"data size: {np.shape(data_list)}")
-        print(f"labels size: {np.shape(label_list)}")
-
-        # for frame_seq in self.data:
-        #     # print(np.shape(item))
-        #     print(np.shape(frame_seq))
-        #     for frame in frame_seq:
-        #         frame = np.array(frame.cpu().numpy())
-        #         print(np.shape(frame))
-        #         Recording.frame_printer(frame)
-
-        # first_data = data[0]
-        # first_label = labels[0]
-
-        # self.view_data_set(1)
-
-    # def view_data_set(self, num=0):
-    #     """
-    #     view the dataset based on data point number. 
-    #     """
-
-    #     # TODO: REMOVE THIS 
-
-    #     data_seq, label = self.__getitem__(num)
-    #     # label = self.labels[num]
-    #     print(type(data_seq))
-    #     print(type(label))
-    #     print(np.shape(data_seq)) # torch.Size([1, 10, 82, 82])
-    #     print(np.shape(label))    # torch.Size([1, 2, 82, 82])
-    #     import time
-    #     # for seq in data_seq:
-    #     for frame in data_seq[0]:
-            
-    #         print('tf')
-    #         frame = np.array(frame.cpu().numpy())
-    #         print(np.max(frame))
-    #         # print(f"HERE DIKBD:SHDNFSL:FSJL:FJ: {np.shape(frame)}")
-    #         Recording.frame_printer(frame)
-    #         time.sleep(.1)
-        
-
-    #     # for l in label:
-    #     #     print(l)
-    #     #     l = np.array(l.cpu().numpy())
-    #     #     print(f"HERE DIKBD:SHDNFSL:FSJL:FJ: {np.shape(l)}")
-    #     #     Recording.frame_printer(l)
-    #     #     time.sleep(.1)
 
     def __len__(self):
         """Returns the total number of samples in the dataset."""
@@ -188,8 +82,6 @@ class VideoDataset(Dataset):
         """Retrieves the sample at the given index.""" 
         x = self.data[idx].unsqueeze(0).to(self.device, non_blocking=True) # DataPoint x Channels x frame_count x H x W
         y = self.labels[idx].unsqueeze(0).to(self.device, non_blocking=True)
-        # x = self.data[idx].to(self.device, non_blocking=True)
-        # y = self.labels[idx].to(self.device, non_blocking=True)
 
         return x, y
 
@@ -287,39 +179,27 @@ class VideoConv3D(nn.Module):
 
             for batch_num, (inputs, targets) in enumerate(dataloader):
 
-                # print(f"inputs: {np.shape(inputs)}")
-                # print(f"targets: {np.shape(targets)}")
-               
-                # with torch.autocast(device_type='cuda', dtype=torch.float16):
-                #     # inputs, targets = inputs, targets.unsqueeze(1)  # Add channel dimension to targets
-                #     inputs = inputs.to(self.device, non_blocking=True)
-                #     targets = targets.to(self.device, non_blocking=True)  # THIS MIGHT REQUIRE AN UNSQUEEZE WHEN THERE ARE MULTIPLE OUTPUT FRAMES
-
-                #     outputs = self(inputs)
-                #     loss = self.loss_fn(outputs, targets)
-
-                #     # print(f"inputs: {np.shape(inputs)}") # ([32, 1, 10, 82, 82])
-                #     # print(f"targets: {np.shape(targets)}") # ([32, 1, ?1?, 82, 82])
-                #     # print(f"outputs: {np.shape(outputs)}") # ([32, 1, 1, 82, 82])
-                #     # print(f"Loss: {loss}")
-
-                # scaler.scale(loss).backward()
-                # scaler.step(self.optimizer)
-                # scaler.update()
-                # self.optimizer.zero_grad()
-
-                self.optimizer.zero_grad()
-
-                inputs, targets = inputs, targets
-
                 print(f"inputs: {np.shape(inputs)}")
                 print(f"targets: {np.shape(targets)}")
+               
+                with torch.autocast(device_type='cuda', dtype=torch.float16):
+                    # inputs, targets = inputs, targets.unsqueeze(1)  # Add channel dimension to targets
+                    inputs = inputs.to(self.device, non_blocking=True)
+                    targets = targets.to(self.device, non_blocking=True)  # THIS MIGHT REQUIRE AN UNSQUEEZE WHEN THERE ARE MULTIPLE OUTPUT FRAMES
 
-                outputs = self(inputs)
-                loss = self.loss_fn(outputs, targets)
+                    outputs = self(inputs)
+                    outputs = outputs.unsqueeze(1)
+                    loss = self.loss_fn(outputs, targets)
 
-                loss.backward()
-                self.optimizer.step()
+                    print(f"inputs: {np.shape(inputs)}") # ([32, 1, 10, 82, 82])
+                    print(f"targets: {np.shape(targets)}") # ([32, 1, ?1?, 82, 82])
+                    print(f"outputs: {np.shape(outputs)}") # ([32, 1, 1, 82, 82])
+                    print(f"Loss: {loss}")
+
+                scaler.scale(loss).backward()
+                scaler.step(self.optimizer)
+                scaler.update()
+                self.optimizer.zero_grad()
 
                 running_loss += loss.item()
 
