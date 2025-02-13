@@ -6,7 +6,6 @@ from torch.utils.data import DataLoader, Dataset
 from . import utils
 import numpy as np
 from os import listdir
-# from torch.cuda.amp import autocast, GradScaler
 
 # TODO find better name for num_label_frames
 
@@ -25,7 +24,7 @@ class VideoDataset(Dataset):
         self.num_label_frames = num_label_frames
         self.data = None
         self.labels = None
-        self.max_recordings = 10
+        self.max_recordings = 200
 
         if not recordings:
             self.load_recordings()
@@ -50,29 +49,38 @@ class VideoDataset(Dataset):
         Each sample consists of `num_frames` consecutive frames as input
         and the next frame as the label.
         """
-
-        data_list = []
-        label_list = []
+        
+        total_frames = sum(len(rec.get_float_frame_seq()) - self.num_input_frames - self.num_label_frames 
+                        for rec in self.recordings)
+        
+        # Get input-output shape
+        example_frame = self.recordings[0].get_float_frame_seq()[0]
+        frame_shape = example_frame.shape  # Assuming frames are NumPy arrays
+        
+        # Preallocate arrays
+        data_array = np.empty((total_frames, self.num_input_frames, *frame_shape), dtype=np.float32)
+        label_array = np.empty((total_frames, self.num_label_frames, *frame_shape), dtype=np.float32)
 
         index = 0
         for num, rec in enumerate(self.recordings):
             print(f"loaded {num+1}/{len(self.recordings)} recordings")
             frame_seq = rec.get_float_frame_seq()
-            for i in range(len(frame_seq) - self.num_input_frames - self.num_label_frames):
-                data = np.copy(frame_seq[i:i + self.num_input_frames])
-                label = np.copy(frame_seq[i + self.num_input_frames : i + self.num_input_frames + self.num_label_frames])
-                data_list.append(data)
-                label_list.append(label)
+            seq_len = len(frame_seq)
+
+            for i in range(seq_len - self.num_input_frames - self.num_label_frames):
+                data_array[index] = frame_seq[i:i + self.num_input_frames]
+                label_array[index] = frame_seq[i + self.num_input_frames : i + self.num_input_frames + self.num_label_frames]
                 index += 1
 
-        data_list = np.stack(data_list)
-        label_list = np.stack(label_list)
+        self.data = torch.from_numpy(data_array)
+        self.labels = torch.from_numpy(label_array)
 
-        self.data = torch.from_numpy(data_list)
-        self.labels = torch.from_numpy(label_list)
+        print(f"Index suggests size should be: {index}")
+        print(f"data array size: {data_array.shape}")
+        print(f"labels array size: {label_array.shape}")
 
-        print(f"data size: {np.shape(data_list)}")
-        print(f"labels size: {np.shape(label_list)}")
+        if index not in data_array.shape and index not in label_array.shape:
+            raise Exception("index suggests that array size is wrong")
 
     def __len__(self):
         """Returns the total number of samples in the dataset."""
@@ -82,6 +90,11 @@ class VideoDataset(Dataset):
         """Retrieves the sample at the given index.""" 
         x = self.data[idx].unsqueeze(0).to(self.device, non_blocking=True) # DataPoint x Channels x frame_count x H x W
         y = self.labels[idx].unsqueeze(0).to(self.device, non_blocking=True)
+
+        # print(f"shape of data at idx: {np.shape(x)}")
+        # print(f"shape of labels at idx: {np.shape(y)}")
+
+
 
         return x, y
 
@@ -104,32 +117,15 @@ class RecursivePredictionLoss(nn.Module):
         self.device = device
         self.num_input_frames = num_input_frames
         self.num_label_frames = num_label_frames
-        self.core_loss_func = nn.MSELoss()
+        self.core_loss_func = WeightedMSELoss()
 
     def forward(self, inputs, target):
         """
         custom loss function for predicting frames using its own generated frames
         """
-        # inputs and outputs have the same size here: torch.Size([32, 1, 10, 82, 82])
 
-        
-
-        predicted_frames = self.prediction_func(inputs, self.num_label_frames) # TODO: This HAS to be a 10 for now
-
-        # print(f"inputs to loss forward: {np.shape(inputs)}")
-        # print(f"predicted frames from loss forward: {np.shape(predicted_frames)}")
-        # print(f"targets to loss forward: {np.shape(target)}")
-
-        # predicted_frames = torch.tensor(predicted_frames, dtype=torch.float32, device=self.device)#.unsqueeze(0).unsqueeze(0)
-        # predicted_frames = predicted_frames.clone().detach().requires_grad_(True)
-
-        # print(f"predicted frame shape: {np.shape(predicted_frames)}")
-        # print(f"target shape: {np.shape(target)}")
-
-        # loss = torch.mean((predicted_frames - target)**2)
-
+        predicted_frames = self.prediction_func(inputs, self.num_label_frames)
         return self.core_loss_func(predicted_frames, target)
-
 
 
 class VideoConv3D(nn.Module):
@@ -162,7 +158,7 @@ class VideoConv3D(nn.Module):
         )
 
         self.loss_fn = RecursivePredictionLoss(self.predict_future_frames, num_input_frames=num_input_frames, num_label_frames=num_label_frames)
-        # self.loss_fn = nn.MSELoss()#WeightedMSELoss(weight=10.0)  # Adjust weight if needed
+        # self.loss_fn = nn.MSELoss()#WeightedMSELoss(weight=10.0)
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         self.to(device)
 
@@ -187,22 +183,10 @@ class VideoConv3D(nn.Module):
 
             for batch_num, (inputs, targets) in enumerate(dataloader):
 
-                # print(f"inputs: {np.shape(inputs)}")
-                # print(f"targets: {np.shape(targets)}")
-               
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
-                    # inputs, targets = inputs, targets.unsqueeze(1)  # Add channel dimension to targets
                     inputs = inputs.to(self.device, non_blocking=True)
-                    targets = targets.to(self.device, non_blocking=True)  # THIS MIGHT REQUIRE AN UNSQUEEZE WHEN THERE ARE MULTIPLE OUTPUT FRAMES
-
-                    # outputs = self(inputs)
-                    # outputs = outputs#.unsqueeze(1)
+                    targets = targets.to(self.device, non_blocking=True)
                     loss = self.loss_fn(inputs, targets)
-
-                    print(f"inputs: {np.shape(inputs)}") # ([32, 1, 10, 82, 82])
-                    print(f"targets: {np.shape(targets)}") # ([32, 1, ?1?, 82, 82])
-                    # print(f"outputs: {np.shape(outputs)}") # ([32, 1, 1, 82, 82])
-                    print(f"Loss: {loss}")
 
                 scaler.scale(loss).backward()
                 scaler.step(self.optimizer)
@@ -292,7 +276,7 @@ class VideoConv3D(nn.Module):
         model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
         return model.to(device)
 
-def main_train():
+def main_train(use_stored_model=None):
     """
     Builds the model, prepares the dataset, and trains the model.
     """
@@ -302,9 +286,17 @@ def main_train():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = VideoDataset(device, num_input_frames=_num_input_frames,num_label_frames=_num_label_frames)
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=False)#, shuffle=True)
 
-    model = VideoConv3D(device=device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
+    if use_stored_model:
+        model_path = utils.get_most_recent_model()
+        print(f"Training model found at {model_path}")
+        model = VideoConv3D.load_model(model_path, num_input_frames = _num_input_frames, device=device)
+    else: 
+        model = VideoConv3D(device=device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
+        model.save_model(utils.get_model_folder())
+        model = VideoConv3D.load_model(utils.get_most_recent_model(), num_input_frames = _num_input_frames, device=device)
+    
     print('started training process')
     model.train_model(dataloader, num_epochs=1)
 
@@ -320,9 +312,6 @@ def main_predict(seed_frames, num_future_frames=10):
     _num_input_frames = 10
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    print(device)
-
     model_path = utils.get_most_recent_model()
     print(f"Running model found at {model_path}")
 

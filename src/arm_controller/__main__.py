@@ -39,7 +39,7 @@ def main():
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
-def generate_data(num_sims=100, sim_time=500, clear_prev_data=True):
+def generate_data(num_sims=500, sim_time=20, clear_prev_data=True):
     """
     generate data for training
 
@@ -54,14 +54,19 @@ def generate_data(num_sims=100, sim_time=500, clear_prev_data=True):
     BatchSim = BatchProcessor(num_sims, sim_time)
     BatchSim.batch_process()
 
-def train_model(clear_old_model=False):
+def train_model(use_stored_model=False):
     """
     train the model!
     
     params here
     """
+
+    if not use_stored_model and input("Making fresh model. \"OLD\" to use existing model. Enter to continue. ") == "OLD":
+        use_stored_model = True
+        # logic can be cleaned. too lazy rn
+
     print("Training model")
-    main_train()
+    main_train(use_stored_model)
 
 def predict():
     print("Predicting future frames")
@@ -69,13 +74,13 @@ def predict():
     _, recording = BatchProcessor.run_single_simulation(0,1)
     print(np.shape(recording.frame_sequence))
 
-    predicted_frames = main_predict(recording.get_float_frame_seq(), 1000)
+    predicted_frames = main_predict(recording.get_float_frame_seq(), 20)
     # print(np.size(recording.get_float_frame_seq()))
     recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames))
     # recording._frame_sequence = predicted_frames[0:1] #
     # recording._frame_sequence = predicted_frames # TODO: super jank, but saves the fps data soooo who cares for now
 
-    # recording.fps = .001
+    recording.fps = 2
 
     player = SimulationPlayer(800, 800)
     player.play(recording)
