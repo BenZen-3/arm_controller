@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader, Dataset
 from . import utils
 import numpy as np
 from os import listdir
+import time # REMOVE LATER
 
 # TODO find better name for num_label_frames
 
@@ -75,11 +76,10 @@ class VideoDataset(Dataset):
         self.data = torch.from_numpy(data_array)
         self.labels = torch.from_numpy(label_array)
 
-        print(f"Index suggests size should be: {index}")
-        print(f"data array size: {data_array.shape}")
-        print(f"labels array size: {label_array.shape}")
-
         if index not in data_array.shape and index not in label_array.shape:
+            print(f"Index suggests size should be: {index}")
+            print(f"data array size: {data_array.shape}")
+            print(f"labels array size: {label_array.shape}")
             raise Exception("index suggests that array size is wrong")
 
     def __len__(self):
@@ -90,11 +90,6 @@ class VideoDataset(Dataset):
         """Retrieves the sample at the given index.""" 
         x = self.data[idx].unsqueeze(0).to(self.device, non_blocking=True) # DataPoint x Channels x frame_count x H x W
         y = self.labels[idx].unsqueeze(0).to(self.device, non_blocking=True)
-
-        # print(f"shape of data at idx: {np.shape(x)}")
-        # print(f"shape of labels at idx: {np.shape(y)}")
-
-
 
         return x, y
 
@@ -208,28 +203,13 @@ class VideoConv3D(nn.Module):
         Generates future frames recursively while maintaining differentiability.
         Uses the model's own predictions as input for future time steps.
         """
-        # self.eval()  # Ensure evaluation mode TODO: NEED ANOTHER PREDICT FOR TESTING
-
-        # # Ensure input tensor has the correct shape: (batch_size, 1, num_frames, 82, 82)
-        # if isinstance(initial_frames, np.ndarray):
-        #     input_frames = torch.tensor(initial_frames, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
-        #     print("WHAT THE FUCK")
-        # else:
-        #     input_frames = initial_frames  # Assume correct shape (batch_size, 1, num_frames, 82, 82)
-
-        # print(f"init frames: {np.shape(initial_frames)}") # ([32, 1, 10, 82, 82])
 
         input_frames = initial_frames  # Assume correct shape (batch_size, 1, num_frames, 82, 82)
         predicted_frames = []
 
         with torch.set_grad_enabled(self.training):  # Enable gradients only during training
             for _ in range(num_future_frames):
-                # Forward pass, ensuring correct output shape (batch_size, 1, 1, 82, 82)
                 next_frame = self(input_frames)  # Model prediction
-
-                # print(f"next frame shape: {np.shape(next_frame)}")
-
-                # Append new frame to predictions
                 predicted_frames.append(next_frame.unsqueeze(2))  # Keep as tensor
 
                 # Prepare next input: remove first frame, append new frame
@@ -285,17 +265,17 @@ def main_train(use_stored_model=None):
     _num_label_frames = 10
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = VideoDataset(device, num_input_frames=_num_input_frames,num_label_frames=_num_label_frames)
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=False)#, shuffle=True)
+    dataset = VideoDataset(device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     if use_stored_model:
         model_path = utils.get_most_recent_model()
         print(f"Training model found at {model_path}")
-        model = VideoConv3D.load_model(model_path, num_input_frames = _num_input_frames, device=device)
+        model = VideoConv3D.load_model(model_path, num_input_frames = _num_input_frames, num_label_frames=_num_label_frames, device=device)
     else: 
         model = VideoConv3D(device=device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
         model.save_model(utils.get_model_folder())
-        model = VideoConv3D.load_model(utils.get_most_recent_model(), num_input_frames = _num_input_frames, device=device)
+        model = VideoConv3D.load_model(utils.get_most_recent_model(), num_input_frames = _num_input_frames, num_label_frames=_num_label_frames, device=device)
     
     print('started training process')
     model.train_model(dataloader, num_epochs=1)
@@ -310,11 +290,12 @@ def main_predict(seed_frames, num_future_frames=10):
     """
 
     _num_input_frames = 10
+    _num_label_frames = 10
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_path = utils.get_most_recent_model()
     print(f"Running model found at {model_path}")
 
-    model = VideoConv3D.load_model(model_path, num_input_frames = _num_input_frames, device=device)
+    model = VideoConv3D.load_model(model_path, num_input_frames = _num_input_frames, num_label_frames=_num_label_frames, device=device)
     future_frames = model.predict_future_frames_testing(seed_frames, num_future_frames)
     return future_frames
