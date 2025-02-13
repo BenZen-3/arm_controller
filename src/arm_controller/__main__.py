@@ -71,11 +71,11 @@ def predict():
 
     predicted_frames = main_predict(recording.get_float_frame_seq(), 1000)
     # print(np.size(recording.get_float_frame_seq()))
-    # recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames))
-    recording._frame_sequence = predicted_frames[0:1] #
+    recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames))
+    # recording._frame_sequence = predicted_frames[0:1] #
     # recording._frame_sequence = predicted_frames # TODO: super jank, but saves the fps data soooo who cares for now
 
-    recording.fps = .001
+    # recording.fps = .001
 
     player = SimulationPlayer(800, 800)
     player.play(recording)
