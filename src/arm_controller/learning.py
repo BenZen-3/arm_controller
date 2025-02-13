@@ -51,12 +51,12 @@ class VideoDataset(Dataset):
         and the next frame as the label.
         """
 
-        num_samples = sum(len(rec.frame_sequence) - self.num_input_frames for rec in self.recordings) - 2*len(self.recordings)
-        print(num_samples)
+        # num_samples = sum(len(rec.frame_sequence) - self.num_input_frames for rec in self.recordings) - 2*len(self.recordings)
+        # print(num_samples)
 
         # Preallocate NumPy arrays
-        data = np.zeros((num_samples, self.num_input_frames, 82, 82), dtype=np.float32)  # TODO: HARDCODED 82
-        labels = np.zeros((num_samples, self.num_label_frames, 82, 82), dtype=np.float32)
+        data_list = [] #np.zeros((num_samples, self.num_input_frames, 82, 82), dtype=np.float32)  # TODO: HARDCODED 82
+        label_list = [] #np.zeros((num_samples, self.num_label_frames, 82, 82), dtype=np.float32)
 
         index = 0
         for num, rec in enumerate(self.recordings):
@@ -64,12 +64,34 @@ class VideoDataset(Dataset):
             frame_seq = rec.get_float_frame_seq()
             # print(np.shape(frame_seq))
             for i in range(len(frame_seq) - self.num_input_frames - self.num_label_frames):
-                print(index)
-                data[index] = np.copy(frame_seq[i:i + self.num_input_frames])
-                labels[index] = np.copy(frame_seq[i + self.num_input_frames : i + self.num_input_frames + self.num_label_frames])#:i + 2*self.num_frames])
+                data = np.copy(frame_seq[i:i + self.num_input_frames])
+                label = np.copy(frame_seq[i + self.num_input_frames : i + self.num_input_frames + self.num_label_frames])
+                data_list.append(data)
+                label_list.append(label)
                 index += 1
 
+        import time
+        start = time.time()
+        data_list = np.stack(data_list)
+        label_list = np.stack(label_list)
+        print(time.time() - start)
 
+        self.data = torch.from_numpy(data_list)
+        self.labels = torch.from_numpy(label_list)
+
+        print(f"data size: {np.shape(data_list)}")
+        print(f"labels size: {np.shape(label_list)}")
+
+        return
+
+                # PREV WORKING
+                # data[index] = np.copy(frame_seq[i:i + self.num_input_frames])
+                # labels[index] = np.copy(frame_seq[i + self.num_input_frames : i + self.num_input_frames + self.num_label_frames])
+                # index += 1
+
+
+
+                # OLD
                 # print(index)
                 # print(f"i:{i}")
                 # print(f"{i + self.num_input_frames} : {i + self.num_input_frames + self.num_label_frames}")
@@ -84,12 +106,34 @@ class VideoDataset(Dataset):
 
                 # print(np.max(labels[index]))
 
+        print("WHY SO SLOW")
 
-        self.data = torch.from_numpy(data)
-        self.labels = torch.from_numpy(labels)
+        print(len(data_list))
+        print(len(label_list))
 
-        print(f"data size: {np.shape(data)}")
-        print(f"labels size: {np.shape(labels)}")
+        data_list = np.stack(data_list)
+        label_list = np.stack(label_list)
+
+        print(f"data size: {np.shape(data_list)}")
+        print(f"labels size: {np.shape(label_list)}")
+
+        # 24945
+        # 24945
+        # data size: (10, 82, 82)
+        # labels size: (1, 82, 82)
+
+        # return
+
+        # data_list = np.concatenate(data_list)
+        # label_list = np.concatenate(label_list)
+
+        # SHOULD GENERATE (24950, 10, 82, 82)
+
+        self.data = torch.from_numpy(data_list)
+        self.labels = torch.from_numpy(label_list)
+
+        print(f"data size: {np.shape(data_list)}")
+        print(f"labels size: {np.shape(label_list)}")
 
         # for frame_seq in self.data:
         #     # print(np.shape(item))
