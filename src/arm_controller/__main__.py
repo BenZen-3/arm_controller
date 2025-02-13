@@ -81,7 +81,7 @@ def predict():
     player.play(recording)
 
 # this is temp and this is trash code
-def playback_recording(rec_num=0):
+def playback_recording(rec_num=9):
     print("Playing recording")
 
     recs = []

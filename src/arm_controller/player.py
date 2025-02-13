@@ -43,6 +43,7 @@ class SimulationPlayer:
             pause_time = frame_time - time_taken
             if pause_time > 0:
                 time.sleep(frame_time - time_taken)
+                # pass
 
             if not self.running: # probably go back to a while(self.running) later
                 break

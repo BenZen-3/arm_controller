@@ -6,6 +6,7 @@ import math
 from decimal import Decimal
 import multiprocessing as mp
 
+# TODO: Make the simulation freq different than the recording FPS
 
 class VoxelState(Enum):
     """

@@ -8,6 +8,7 @@ import numpy as np
 from os import listdir
 # from torch.cuda.amp import autocast, GradScaler
 
+# TODO: switch away from a pre-allocated array because i have like no ram :(
 
 class VideoDataset(Dataset):
     """
@@ -24,7 +25,7 @@ class VideoDataset(Dataset):
         self.num_label_frames = num_label_frames
         self.data = None
         self.labels = None
-        self.max_recordings = 1
+        self.max_recordings = 5
 
         if not recordings:
             self.load_recordings()
@@ -50,8 +51,9 @@ class VideoDataset(Dataset):
         and the next frame as the label.
         """
 
-        num_samples = sum(len(rec.get_float_frame_seq()) - self.num_input_frames for rec in self.recordings)
-    
+        num_samples = sum(len(rec.frame_sequence) - self.num_input_frames for rec in self.recordings) - 2*len(self.recordings)
+        print(num_samples)
+
         # Preallocate NumPy arrays
         data = np.zeros((num_samples, self.num_input_frames, 82, 82), dtype=np.float32)  # TODO: HARDCODED 82
         labels = np.zeros((num_samples, self.num_label_frames, 82, 82), dtype=np.float32)
@@ -62,53 +64,77 @@ class VideoDataset(Dataset):
             frame_seq = rec.get_float_frame_seq()
             # print(np.shape(frame_seq))
             for i in range(len(frame_seq) - self.num_input_frames - self.num_label_frames):
+                print(index)
                 data[index] = np.copy(frame_seq[i:i + self.num_input_frames])
                 labels[index] = np.copy(frame_seq[i + self.num_input_frames : i + self.num_input_frames + self.num_label_frames])#:i + 2*self.num_frames])
+                index += 1
+
+
+                # print(index)
+                # print(f"i:{i}")
                 # print(f"{i + self.num_input_frames} : {i + self.num_input_frames + self.num_label_frames}")
-                print(f"input {self.num_input_frames}")
-                print(f"label {self.num_label_frames}")
+                # print(f"input {self.num_input_frames}")
+                # print(f"label {self.num_label_frames}")
                 #np.ones((82,82))#np.copy(frame_seq[i + self.num_frames])#:i + 2*self.num_frames]) # 2*_ might be wrong
                 # print(np.shape(labels[index]))
+
+                # frame = labels[index]
+                # print(np.shape(frame))
+                # Recording.frame_printer(frame[0])
+
+                # print(np.max(labels[index]))
+
 
         self.data = torch.from_numpy(data)
         self.labels = torch.from_numpy(labels)
 
-        print(f"data: {np.shape(data)}")
-        print(f"labels: {np.shape(labels)}")
+        print(f"data size: {np.shape(data)}")
+        print(f"labels size: {np.shape(labels)}")
+
+        # for frame_seq in self.data:
+        #     # print(np.shape(item))
+        #     print(np.shape(frame_seq))
+        #     for frame in frame_seq:
+        #         frame = np.array(frame.cpu().numpy())
+        #         print(np.shape(frame))
+        #         Recording.frame_printer(frame)
 
         # first_data = data[0]
         # first_label = labels[0]
 
-        self.view_data_set(0)
+        # self.view_data_set(1)
 
-    def view_data_set(self, num=0):
-        """
-        view the dataset based on data point number. 
-        """
+    # def view_data_set(self, num=0):
+    #     """
+    #     view the dataset based on data point number. 
+    #     """
 
-        # TODO: REMOVE THIS 
+    #     # TODO: REMOVE THIS 
 
-        data_seq, label = self.__getitem__(num)
-        # label = self.labels[num]
-        print(type(data_seq))
-        print(type(label))
-        print(np.shape(data_seq))
-        print(np.shape(label))
-        import time
-        # for seq in data_seq:
-        for frame in data_seq:
-            frame = np.array(frame.cpu().numpy())
-            # print(f"HERE DIKBD:SHDNFSL:FSJL:FJ: {np.shape(frame)}")
-            Recording.frame_printer(frame)
-            time.sleep(.1)
+    #     data_seq, label = self.__getitem__(num)
+    #     # label = self.labels[num]
+    #     print(type(data_seq))
+    #     print(type(label))
+    #     print(np.shape(data_seq)) # torch.Size([1, 10, 82, 82])
+    #     print(np.shape(label))    # torch.Size([1, 2, 82, 82])
+    #     import time
+    #     # for seq in data_seq:
+    #     for frame in data_seq[0]:
+            
+    #         print('tf')
+    #         frame = np.array(frame.cpu().numpy())
+    #         print(np.max(frame))
+    #         # print(f"HERE DIKBD:SHDNFSL:FSJL:FJ: {np.shape(frame)}")
+    #         Recording.frame_printer(frame)
+    #         time.sleep(.1)
         
 
-        # for l in label:
-        #     print(l)
-        #     l = np.array(l.cpu().numpy())
-        #     print(f"HERE DIKBD:SHDNFSL:FSJL:FJ: {np.shape(l)}")
-        #     Recording.frame_printer(l)
-        #     time.sleep(.1)
+    #     # for l in label:
+    #     #     print(l)
+    #     #     l = np.array(l.cpu().numpy())
+    #     #     print(f"HERE DIKBD:SHDNFSL:FSJL:FJ: {np.shape(l)}")
+    #     #     Recording.frame_printer(l)
+    #     #     time.sleep(.1)
 
     def __len__(self):
         """Returns the total number of samples in the dataset."""
@@ -116,8 +142,10 @@ class VideoDataset(Dataset):
 
     def __getitem__(self, idx):
         """Retrieves the sample at the given index.""" 
-        x = self.data[idx].unsqueeze(0).to(self.device, non_blocking=True)
+        x = self.data[idx].unsqueeze(0).to(self.device, non_blocking=True) # DataPoint x Channels x frame_count x H x W
         y = self.labels[idx].unsqueeze(0).to(self.device, non_blocking=True)
+        # x = self.data[idx].to(self.device, non_blocking=True)
+        # y = self.labels[idx].to(self.device, non_blocking=True)
 
         return x, y
 
@@ -238,7 +266,10 @@ class VideoConv3D(nn.Module):
 
                 self.optimizer.zero_grad()
 
-                inputs, targets = inputs, targets.unsqueeze(1)
+                inputs, targets = inputs, targets
+
+                print(f"inputs: {np.shape(inputs)}")
+                print(f"targets: {np.shape(targets)}")
 
                 outputs = self(inputs)
                 loss = self.loss_fn(outputs, targets)
@@ -362,7 +393,7 @@ def main_train():
     """
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = VideoDataset(device, num_input_frames=10,num_label_frames=2)
+    dataset = VideoDataset(device, num_input_frames=10,num_label_frames=1)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
     model = VideoConv3D(device=device)
