@@ -8,7 +8,7 @@ import numpy as np
 from os import listdir
 # from torch.cuda.amp import autocast, GradScaler
 
-# TODO: switch away from a pre-allocated array because i have like no ram :(
+# TODO find better name for num_label_frames
 
 class VideoDataset(Dataset):
     """
@@ -25,7 +25,7 @@ class VideoDataset(Dataset):
         self.num_label_frames = num_label_frames
         self.data = None
         self.labels = None
-        self.max_recordings = 5
+        self.max_recordings = 10
 
         if not recordings:
             self.load_recordings()
@@ -98,11 +98,12 @@ class WeightedMSELoss(nn.Module):
 
 
 class RecursivePredictionLoss(nn.Module):
-    def __init__(self, prediction_func, device = 'cuda', num_frames=10):
+    def __init__(self, prediction_func, device = 'cuda', num_input_frames=10, num_label_frames=1):
         super().__init__()
         self.prediction_func = prediction_func
         self.device = device
-        self.num_frames = num_frames
+        self.num_input_frames = num_input_frames
+        self.num_label_frames = num_label_frames
         self.core_loss_func = nn.MSELoss()
 
     def forward(self, inputs, target):
@@ -111,7 +112,14 @@ class RecursivePredictionLoss(nn.Module):
         """
         # inputs and outputs have the same size here: torch.Size([32, 1, 10, 82, 82])
 
-        predicted_frames = self.prediction_func(inputs, self.num_frames) # TODO: This HAS to be a 10 for now
+        
+
+        predicted_frames = self.prediction_func(inputs, self.num_label_frames) # TODO: This HAS to be a 10 for now
+
+        # print(f"inputs to loss forward: {np.shape(inputs)}")
+        # print(f"predicted frames from loss forward: {np.shape(predicted_frames)}")
+        # print(f"targets to loss forward: {np.shape(target)}")
+
         # predicted_frames = torch.tensor(predicted_frames, dtype=torch.float32, device=self.device)#.unsqueeze(0).unsqueeze(0)
         # predicted_frames = predicted_frames.clone().detach().requires_grad_(True)
 
@@ -129,7 +137,7 @@ class VideoConv3D(nn.Module):
     A 3D convolutional neural network model for video frame prediction,
     including training and prediction functionalities.
     """
-    def __init__(self, input_channels=1, output_channels=1, num_frames=10, device="cpu", learning_rate=0.001):
+    def __init__(self, input_channels=1, output_channels=1, num_input_frames=10, num_label_frames=1, device="cpu", learning_rate=0.001):
         """
         Initializes the 3D CNN model architecture along with training utilities.
         """
@@ -150,11 +158,11 @@ class VideoConv3D(nn.Module):
         self.decoder = nn.Sequential(
             nn.Conv3d(b, a, kernel_size=(3, 3, 3), stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv3d(a, output_channels, kernel_size=(num_frames, 3, 3), stride=(num_frames, 1, 1), padding=(0, 1, 1)),
+            nn.Conv3d(a, output_channels, kernel_size=(num_input_frames, 3, 3), stride=(num_input_frames, 1, 1), padding=(0, 1, 1)),
         )
 
-        # self.loss_fn = RecursivePredictionLoss(self.predict_future_frames)
-        self.loss_fn = nn.MSELoss()#WeightedMSELoss(weight=10.0)  # Adjust weight if needed
+        self.loss_fn = RecursivePredictionLoss(self.predict_future_frames, num_input_frames=num_input_frames, num_label_frames=num_label_frames)
+        # self.loss_fn = nn.MSELoss()#WeightedMSELoss(weight=10.0)  # Adjust weight if needed
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         self.to(device)
 
@@ -179,21 +187,21 @@ class VideoConv3D(nn.Module):
 
             for batch_num, (inputs, targets) in enumerate(dataloader):
 
-                print(f"inputs: {np.shape(inputs)}")
-                print(f"targets: {np.shape(targets)}")
+                # print(f"inputs: {np.shape(inputs)}")
+                # print(f"targets: {np.shape(targets)}")
                
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
                     # inputs, targets = inputs, targets.unsqueeze(1)  # Add channel dimension to targets
                     inputs = inputs.to(self.device, non_blocking=True)
                     targets = targets.to(self.device, non_blocking=True)  # THIS MIGHT REQUIRE AN UNSQUEEZE WHEN THERE ARE MULTIPLE OUTPUT FRAMES
 
-                    outputs = self(inputs)
-                    outputs = outputs.unsqueeze(1)
-                    loss = self.loss_fn(outputs, targets)
+                    # outputs = self(inputs)
+                    # outputs = outputs#.unsqueeze(1)
+                    loss = self.loss_fn(inputs, targets)
 
                     print(f"inputs: {np.shape(inputs)}") # ([32, 1, 10, 82, 82])
                     print(f"targets: {np.shape(targets)}") # ([32, 1, ?1?, 82, 82])
-                    print(f"outputs: {np.shape(outputs)}") # ([32, 1, 1, 82, 82])
+                    # print(f"outputs: {np.shape(outputs)}") # ([32, 1, 1, 82, 82])
                     print(f"Loss: {loss}")
 
                 scaler.scale(loss).backward()
@@ -225,6 +233,8 @@ class VideoConv3D(nn.Module):
         # else:
         #     input_frames = initial_frames  # Assume correct shape (batch_size, 1, num_frames, 82, 82)
 
+        # print(f"init frames: {np.shape(initial_frames)}") # ([32, 1, 10, 82, 82])
+
         input_frames = initial_frames  # Assume correct shape (batch_size, 1, num_frames, 82, 82)
         predicted_frames = []
 
@@ -246,43 +256,14 @@ class VideoConv3D(nn.Module):
 
         return recursive_prediction  # Fully torch-based, maintains computation graph
 
-
-    # def predict_future_frames(self, initial_frames, num_future_frames):
-    #     """
-    #     Generates future frames based on the initial input frames.
-    #     Ensures correct batch and channel shape for batch processing.
-    #     """
-    #     self.eval()
-
-    #     # Ensure input tensor has the correct shape: (batch_size, channels=1, num_frames, height=82, width=82)
-    #     if isinstance(initial_frames, np.ndarray):
-    #         input_frames = torch.tensor(initial_frames, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
-    #     else:
-    #         input_frames = initial_frames  # Assume correct shape (batch_size, 1, num_frames, 82, 82)
-
-    #     predicted_frames = []
-
-    #     with torch.no_grad():
-    #         for _ in range(num_future_frames):
-    #             # Forward pass, ensuring correct output shape (batch_size, 1, 1, 82, 82)
-    #             next_frame = self(input_frames)  # Expected output: (batch_size, 1, 1, 82, 82)
-
-    #             # Prepare next input (remove first frame, append new frame)
-    #             prior_inputs = input_frames[:, :, 1:, :, :]  # Keep batch, remove oldest frame
-    #             output = next_frame[:, :, :, :].unsqueeze(2)  # Ensure it has shape (batch_size, 1, 1, 82, 82)
-
-    #             predicted_frames.append(output.cpu().numpy())
-    #             input_frames = torch.cat((prior_inputs, output), dim=2)  # Shape: (batch_size, 1, num_frames, 82, 82)
-
-    #     recursive_prediction = np.stack(predicted_frames, axis=2).squeeze(3)
-    #     return recursive_prediction
-
     def predict_future_frames_testing(self, initial_frames, num_future_frames):
         """
         Generates future frames based on the initial input frames.
         """
         self.eval()
         input_frames = torch.tensor(initial_frames, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+
+        print(np.shape(input_frames))
         predicted_frames = []
 
         with torch.no_grad():
@@ -305,9 +286,9 @@ class VideoConv3D(nn.Module):
         torch.save(self.state_dict(), save_file)
 
     @staticmethod
-    def load_model(path, input_channels=1, output_channels=1, num_frames=10, device="cpu"):
+    def load_model(path, input_channels=1, output_channels=1, num_input_frames=10, num_label_frames=1, device="cpu"):
         """Loads a saved model from disk."""
-        model = VideoConv3D(input_channels, output_channels, num_frames, device)
+        model = VideoConv3D(input_channels, output_channels, num_input_frames, num_label_frames, device)
         model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
         return model.to(device)
 
@@ -316,11 +297,14 @@ def main_train():
     Builds the model, prepares the dataset, and trains the model.
     """
 
+    _num_input_frames = 10
+    _num_label_frames = 10
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset = VideoDataset(device, num_input_frames=10,num_label_frames=1)
+    dataset = VideoDataset(device, num_input_frames=_num_input_frames,num_label_frames=_num_label_frames)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
-    model = VideoConv3D(device=device)
+    model = VideoConv3D(device=device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
     print('started training process')
     model.train_model(dataloader, num_epochs=1)
 
@@ -332,11 +316,16 @@ def main_predict(seed_frames, num_future_frames=10):
     """
     Loads a trained model and generates future frames given a seed frame.
     """
+
+    _num_input_frames = 10
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    print(device)
 
     model_path = utils.get_most_recent_model()
     print(f"Running model found at {model_path}")
 
-    model = VideoConv3D.load_model(model_path, device=device)
+    model = VideoConv3D.load_model(model_path, num_input_frames = _num_input_frames, device=device)
     future_frames = model.predict_future_frames_testing(seed_frames, num_future_frames)
     return future_frames
