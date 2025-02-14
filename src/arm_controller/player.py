@@ -30,8 +30,6 @@ class SimulationPlayer:
         frame_time = 1/recording.fps
         self.running = True
 
-        time.sleep(2)
-
         for frame in recording.frame_sequence:
 
             frame_start = time.time()

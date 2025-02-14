@@ -64,7 +64,7 @@ class VideoDataset(Dataset):
 
         index = 0
         for num, rec in enumerate(self.recordings):
-            print(f"loaded {num+1}/{len(self.recordings)} recordings")
+            # print(f"loaded {num+1}/{len(self.recordings)} recordings")
             frame_seq = rec.get_float_frame_seq()
             seq_len = len(frame_seq)
 
@@ -123,6 +123,17 @@ class RecursivePredictionLoss(nn.Module):
         return self.core_loss_func(predicted_frames, target)
 
 
+# Residual block for deeper modeling
+class Residual3DBlock(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.conv = nn.Conv3d(channels, channels, kernel_size=3, padding=1)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        return self.relu(self.conv(x) + x)  # Residual connection
+
+
 class VideoConv3D(nn.Module):
     """
     A 3D convolutional neural network model for video frame prediction,
@@ -135,25 +146,35 @@ class VideoConv3D(nn.Module):
         super().__init__()
         self.device = device
 
-        a = 16
-        b = 32
-
-        # 3D Convolutional layers
+        a, b = 128, 256
+        
+        # Encoder with residual blocks
         self.encoder = nn.Sequential(
-            nn.Conv3d(input_channels, a, kernel_size=(3, 3, 3), stride=1, padding=1),
+            nn.Conv3d(input_channels, a, kernel_size=(3,3,3), stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv3d(a, b, kernel_size=(3, 3, 3), stride=1, padding=1),
+            # Residual3DBlock(a),
+            nn.Conv3d(a, b, kernel_size=(3,3,3), stride=1, padding=1),
             nn.ReLU(),
+            # Residual3DBlock(b)
         )
         
-        self.decoder = nn.Sequential(
-            nn.Conv3d(b, a, kernel_size=(3, 3, 3), stride=1, padding=1),
+        # Bottleneck: 
+        self.bottleneck = nn.Sequential(
+            nn.Conv3d(b, b, kernel_size=(3,3,3), stride=1, padding=1),  # Smaller kernel
             nn.ReLU(),
-            nn.Conv3d(a, output_channels, kernel_size=(num_input_frames, 3, 3), stride=(num_input_frames, 1, 1), padding=(0, 1, 1)),
+        )
+
+        # Decoder with upsampling
+        self.decoder = nn.Sequential(
+            # Residual3DBlock(b),
+            nn.Conv3d(b, a, kernel_size=(3,3,3), stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv3d(a, a, kernel_size=(3,3,3), stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv3d(a, output_channels, kernel_size=(num_input_frames, 3, 3), stride=(num_input_frames, 1, 1), padding=(0, 1, 1))
         )
 
         self.loss_fn = RecursivePredictionLoss(self.predict_future_frames, num_input_frames=num_input_frames, num_label_frames=num_label_frames)
-        # self.loss_fn = nn.MSELoss()#WeightedMSELoss(weight=10.0)
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         self.to(device)
 
@@ -266,7 +287,7 @@ def main_train(use_stored_model=None):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = VideoDataset(device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
 
     if use_stored_model:
         model_path = utils.get_most_recent_model()
@@ -274,11 +295,19 @@ def main_train(use_stored_model=None):
         model = VideoConv3D.load_model(model_path, num_input_frames = _num_input_frames, num_label_frames=_num_label_frames, device=device)
     else: 
         model = VideoConv3D(device=device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
-        model.save_model(utils.get_model_folder())
-        model = VideoConv3D.load_model(utils.get_most_recent_model(), num_input_frames = _num_input_frames, num_label_frames=_num_label_frames, device=device)
-    
-    print('started training process')
-    model.train_model(dataloader, num_epochs=1)
+
+
+    # TODO: This is user I/O. probably best to move it all to the main file
+    try: 
+        print('started training process')
+        model.train_model(dataloader, num_epochs=1)
+    except Exception as e:
+        do_save = input(f"Exception encountered! {e} \n\n Would you like to save the model anyways? \"YES\" to save") == "YES"
+        if do_save:
+            model_save_path = utils.get_model_folder()
+            model.save_model(model_save_path)
+        else:
+            return
 
     model_save_path = utils.get_model_folder()
     model.save_model(model_save_path)

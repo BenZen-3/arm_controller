@@ -290,7 +290,7 @@ class BatchProcessor:
         self.save_path = utils.get_data_folder()
 
     @staticmethod
-    def run_single_simulation(sim_id, sim_time, width=4.1, height=4.1, voxel_size=0.05, save_path = None):
+    def run_single_simulation(sim_id, sim_time, width=4.2, height=4.2, voxel_size=0.065625, save_path = None):
         """
         Run a single simulation and return its recording.
         
@@ -326,7 +326,7 @@ class BatchProcessor:
         with mp.Pool(processes=mp.cpu_count()-1) as pool:
             # Prepare simulation arguments
             tasks = [
-                (sim_id, self.sim_time, 4.1, 4.1, 0.05, self.save_path)  # TODO: FIX THIS HARDCODED SHIT
+                (sim_id, self.sim_time, 4.2, 4.2, 0.065625, self.save_path)  # TODO: FIX THIS HARDCODED SHIT
                 for sim_id in range(self.num_sims)
             ]
             # Run simulations in parallel

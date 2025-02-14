@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description="Arm controller Package")
     parser.add_argument(
         '--mode', 
-        choices=['generator', 'trainer', 'predictor', 'playback'], 
+        choices=['generator', 'trainer', 'predictor', 'playback', "auto_idiot"], 
         default='generator',
         help='Choose which module to run. Generate data, train on data, or predict a sequence from a random starting state'
     )
@@ -35,6 +35,8 @@ def main():
         predict()
     elif args.mode == 'playback':
         playback_recording()
+    elif args.mode == 'auto_idiot':
+        auto_idiot()
         
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
@@ -74,7 +76,7 @@ def predict():
     _, recording = BatchProcessor.run_single_simulation(0,1)
     print(np.shape(recording.frame_sequence))
 
-    predicted_frames = main_predict(recording.get_float_frame_seq(), 20)
+    predicted_frames = main_predict(recording.get_float_frame_seq(), 100)
     # print(np.size(recording.get_float_frame_seq()))
     recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames))
     # recording._frame_sequence = predicted_frames[0:1] #
@@ -83,6 +85,7 @@ def predict():
     recording.fps = 2
 
     player = SimulationPlayer(800, 800)
+    # time.sleep(2)
     player.play(recording)
 
 # this is temp and this is trash code
@@ -104,6 +107,23 @@ def playback_recording(rec_num=9):
 
     player = SimulationPlayer(800, 800)
     player.play(play_me)
+
+def auto_idiot():
+
+    num_runs = 100
+    
+    num_sims = 200
+    sim_time = 20
+
+    for i in range(num_runs):
+
+        utils.clear_old_data()
+        BatchSim = BatchProcessor(num_sims, sim_time)
+        BatchSim.batch_process()
+        print(f"Run Number {i}")
+        time.sleep(5)
+        main_train(use_stored_model=True)
+
 
 if __name__ == "__main__":
 

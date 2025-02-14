@@ -11,8 +11,26 @@ each object should be its own channel of input - up to N channels of input, all 
 reason in 2D by taking slices of 3d problems and putting them in 2D
 
 
+what if it became 'stateful' by labelling portions of the voxels not only with the object, but the portion of state
+    its like 'inherent state'
+
+step 1: look at image and segment into objects
+step 2: look at objects and segment into components for state
+step 3: predict how the state of each object will update
+step 4: predict how the robot should update with the state updates
+
+how to learn a new robot:
+give it a robot and a task
+tell it to get to complete a task - it guesses a voxel state
+the error is how terrible the voxel state is versus the robot's ability to get to that state
 
 
+if you feed a sequence of stuff to a transformer - just tag the position, who cares about feeding the useless empty space. it should rely
+on the position tag, nothing more, nothing less
+
+how can and input sequence be leveraged as 'learning a task'
+    like if i add a sequence to my prompt as an example of the skill completion - that could be helpful
+    then you only need one example or very few examples of skill completion
 
 """
 
