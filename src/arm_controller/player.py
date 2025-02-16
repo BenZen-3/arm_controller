@@ -75,7 +75,7 @@ class SimulationPlayer:
         self.screen.fill(BLACK)
 
     def voxel_color(self, original_color, voxel_val):
-        r, g, b = iter(original_color)
+        r, g, b = iter(original_color)                      # TODO: FIX THIS: OverflowError: cannot convert float infinity to integer HERE: r = max(0, min(255, round(r * voxel_val)))
         r = max(0, min(255, round(r * voxel_val))) # this is UGLY
         g = max(0, min(255, round(g * voxel_val)))
         b = max(0, min(255, round(b * voxel_val)))

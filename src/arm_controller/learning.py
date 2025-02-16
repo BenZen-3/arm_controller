@@ -25,7 +25,7 @@ class VideoDataset(Dataset):
         self.num_label_frames = num_label_frames
         self.data = None
         self.labels = None
-        self.max_recordings = 200
+        self.max_recordings = 500
 
         if not recordings:
             self.load_recordings()
@@ -51,11 +51,11 @@ class VideoDataset(Dataset):
         and the next frame as the label.
         """
         
-        total_frames = sum(len(rec.get_float_frame_seq()) - self.num_input_frames - self.num_label_frames 
+        total_frames = sum(len(rec.frame_sequence) - self.num_input_frames - self.num_label_frames 
                         for rec in self.recordings)
         
         # Get input-output shape
-        example_frame = self.recordings[0].get_float_frame_seq()[0]
+        example_frame = self.recordings[0].frame_sequence[0]
         frame_shape = example_frame.shape  # Assuming frames are NumPy arrays
         
         # Preallocate arrays
@@ -65,7 +65,7 @@ class VideoDataset(Dataset):
         index = 0
         for num, rec in enumerate(self.recordings):
             # print(f"loaded {num+1}/{len(self.recordings)} recordings")
-            frame_seq = rec.get_float_frame_seq() # TODO: THIS IS A MEMORY EATING HUNK OF JUNK. DO DIVISION LATER
+            frame_seq = rec.frame_sequence
             seq_len = len(frame_seq)
 
             for i in range(seq_len - self.num_input_frames - self.num_label_frames):
@@ -82,11 +82,11 @@ class VideoDataset(Dataset):
             print(f"labels array size: {label_array.shape}")
             raise Exception("index suggests that array size is wrong")
         
-        print(np.shape(self.recordings[0].get_float_frame_seq()))
-        print(len(self.data))
-        print(len(self.labels))
-        print(f"data array size: {data_array.shape}")
-        print(f"labels array size: {label_array.shape}")
+        # print(np.shape(self.recordings[0].get_float_frame_seq()))
+        # print(len(self.data))
+        # print(len(self.labels))
+        # print(f"data array size: {data_array.shape}")
+        # print(f"labels array size: {label_array.shape}")
 
         # for frame in np.array(self.data[0].cpu().numpy()):
         #     Recording.frame_printer(frame)
@@ -100,10 +100,10 @@ class VideoDataset(Dataset):
 
     def __getitem__(self, idx):
         """Retrieves the sample at the given index.""" 
-        x = self.data[idx].unsqueeze(0).to(self.device, non_blocking=True) # DataPoint x Channels x frame_count x H x W
-        y = self.labels[idx].unsqueeze(0).to(self.device, non_blocking=True)
+        x = self.data[idx].unsqueeze(0).to(self.device, non_blocking=True) / 255.0 # TODO: get this number from somewhere instead of this hardcoded bs
+        y = self.labels[idx].unsqueeze(0).to(self.device, non_blocking=True) / 255.0
 
-        return x, y
+        return x, y # (Batch DataPoint x Channels x frame_count x H x W) , (Label)
 
 class WeightedMSELossOLD(nn.Module):
     def __init__(self, weight=10.0):
@@ -206,21 +206,49 @@ class FramePredictionModel(nn.Module):
         self.num_input_frames = num_input_frames
         self.num_label_frames = num_label_frames
 
-        a = 16
-        b = 32
+        # a = 32
+        # b = 64
 
-        # 3D Convolutional layers
+        # kern_size = (5,3,3)
+
+        # # 3D Convolutional layers
+        # self.encoder = nn.Sequential(
+        #     nn.Conv3d(input_channels, a, kernel_size=kern_size, stride=1, padding=1),
+        #     nn.ReLU(),
+        #     nn.Conv3d(a, b, kernel_size=kern_size, stride=1, padding=1),
+        #     nn.ReLU(),
+        # )
+        
+
+        # output_kern_size = (num_input_frames, 3, 3)
+        # self.decoder = nn.Sequential(
+        #     nn.Conv3d(b, a, kernel_size=kern_size, stride=1, padding=1),
+        #     nn.ReLU(),
+        #     nn.Conv3d(a, output_channels, kernel_size=output_kern_size, stride=(num_input_frames, 1, 1), padding=(0, 1, 1)),
+        # )
+
+
+        a = 32
+        b = 64
+
+        kern_size = (3, 3, 3)  # (Temporal, Height, Width)
+        padding = (2, 1, 1)    # Ensures spatial dimensions remain constant
+
+        # Encoder
         self.encoder = nn.Sequential(
-            nn.Conv3d(input_channels, a, kernel_size=(3, 3, 3), stride=1, padding=1),
+            nn.Conv3d(input_channels, a, kernel_size=kern_size, stride=1, padding=padding),
             nn.ReLU(),
-            nn.Conv3d(a, b, kernel_size=(3, 3, 3), stride=1, padding=1),
+            nn.Conv3d(a, b, kernel_size=kern_size, stride=1, padding=padding),
             nn.ReLU(),
         )
-        
+
+        # Decoder
+        output_kern_size = (num_input_frames, 3, 3)  # Match input frame count in temporal dim
         self.decoder = nn.Sequential(
-            nn.Conv3d(b, a, kernel_size=(3, 3, 3), stride=1, padding=1),
+            nn.Conv3d(b, a, kernel_size=(5,3,3), stride=1, padding=(2,1,1)),
             nn.ReLU(),
-            nn.Conv3d(a, output_channels, kernel_size=(num_input_frames, 3, 3), stride=(num_input_frames, 1, 1), padding=(0, 1, 1)),
+            nn.Conv3d(a, output_channels, kernel_size=output_kern_size, 
+                      stride=(num_input_frames, 1, 1), padding=(0, 1, 1)),  # Keep stride as required
         )
 
 
@@ -283,22 +311,22 @@ class FramePredictionModel(nn.Module):
                     targets = targets.to(self.device, non_blocking=True)
                     loss = self.loss_fn(inputs, targets) # MODIFIED
 
-                    print(np.shape(inputs))
-                    print(np.shape(targets))
-                    print(np.shape(self(inputs)))
+                    # print(np.shape(inputs))
+                    # print(np.shape(targets))
+                    # print(np.shape(self(inputs)))
 
-                    # I/O here:
-                    # torch.Size([10, 1, 10, 64, 64])
-                    # torch.Size([10, 1, 64, 64])
-
-
-
-                    # for f in inputs[0][0].cpu().numpy():
-                    #     Recording.frame_printer(f)
-                    #     time.sleep(.01)
+                    # # I/O here:
+                    # # torch.Size([10, 1, 10, 64, 64])
+                    # # torch.Size([10, 1, 64, 64])
 
 
-                    # Recording.frame_printer(targets[0][0][0].cpu().numpy())
+
+                    # # for f in inputs[0][0].cpu().numpy():
+                    # #     Recording.frame_printer(f)
+                    # #     time.sleep(.01)
+
+
+                    # # Recording.frame_printer(targets[0][0][0].cpu().numpy())
 
                 scaler.scale(loss).backward()
                 scaler.step(self.optimizer)
@@ -352,35 +380,6 @@ class FramePredictionModel(nn.Module):
         print(np.shape(prediction))
         return prediction.cpu().numpy()
 
-
-    def predict_future_frames_testingOLD(self, initial_frames, num_future_frames):
-        """
-        Generates future frames based on the initial input frames.
-        """
-
-        # I/O here:
-        # torch.Size([1, 1, 21, 64, 64])
-        # torch.Size([1, 1, 2, 64, 64])
-
-        print(np.shape(initial_frames))
-        self.eval()
-        initial_frames = initial_frames[:self.num_input_frames]
-        input_frames = torch.tensor(initial_frames, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
-
-        print(np.shape(input_frames))
-        predicted_frames = []
-
-        with torch.no_grad():
-            for _ in range(num_future_frames):
-                next_frame = self(input_frames).squeeze().cpu().numpy()
-                print(np.shape(self(input_frames)))
-
-                predicted_frames.append(next_frame)
-                input_frames = torch.cat(
-                    (input_frames[:, :, 1:, :, :], torch.tensor(next_frame, dtype=torch.float32, device=self.device)
-                     .unsqueeze(0).unsqueeze(0).unsqueeze(2)), dim=2)
-        return np.array(predicted_frames)
-
     def save_model(self, save_folder):
         """Saves the trained model to a specified path."""
 
@@ -404,7 +403,7 @@ def main_train(use_stored_model=None):
     """
 
     _num_input_frames = 10
-    _num_label_frames = 1
+    _num_label_frames = 10
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = VideoDataset(device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
@@ -421,7 +420,7 @@ def main_train(use_stored_model=None):
     # TODO: This is user I/O. probably best to move it all to the main file
     try: 
         print('Started training process')
-        model.train_model(dataloader, num_epochs=10000)
+        model.train_model(dataloader, num_epochs=1)
     except KeyboardInterrupt:
         do_save = input(f"\n\nTraining stopped!\n\n    Would you like to save the model anyways? \"SAVE\" to save; Enter to discard: ") == "SAVE"
         if not do_save:
@@ -437,7 +436,7 @@ def main_predict(seed_frames, num_future_frames=10):
     """
 
     _num_input_frames = 10
-    _num_label_frames = 1
+    _num_label_frames = 10
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_path = utils.get_most_recent_model()
