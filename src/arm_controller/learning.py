@@ -65,7 +65,7 @@ class VideoDataset(Dataset):
         index = 0
         for num, rec in enumerate(self.recordings):
             # print(f"loaded {num+1}/{len(self.recordings)} recordings")
-            frame_seq = rec.get_float_frame_seq()
+            frame_seq = rec.get_float_frame_seq() # TODO: THIS IS A MEMORY EATING HUNK OF JUNK. DO DIVISION LATER
             seq_len = len(frame_seq)
 
             for i in range(seq_len - self.num_input_frames - self.num_label_frames):
@@ -81,6 +81,18 @@ class VideoDataset(Dataset):
             print(f"data array size: {data_array.shape}")
             print(f"labels array size: {label_array.shape}")
             raise Exception("index suggests that array size is wrong")
+        
+        print(np.shape(self.recordings[0].get_float_frame_seq()))
+        print(len(self.data))
+        print(len(self.labels))
+        print(f"data array size: {data_array.shape}")
+        print(f"labels array size: {label_array.shape}")
+
+        # for frame in np.array(self.data[0].cpu().numpy()):
+        #     Recording.frame_printer(frame)
+
+        # time.sleep(10)
+
 
     def __len__(self):
         """Returns the total number of samples in the dataset."""
@@ -93,7 +105,7 @@ class VideoDataset(Dataset):
 
         return x, y
 
-class WeightedMSELoss(nn.Module):
+class WeightedMSELossOLD(nn.Module):
     def __init__(self, weight=10.0):
         super().__init__()
         self.weight = weight
@@ -112,7 +124,7 @@ class RecursivePredictionLoss(nn.Module):
         self.device = device
         self.num_input_frames = num_input_frames
         self.num_label_frames = num_label_frames
-        self.core_loss_func = WeightedMSELoss()
+        self.core_loss_func = nn.MSELoss()
 
     def forward(self, inputs, target):
         """
@@ -123,18 +135,63 @@ class RecursivePredictionLoss(nn.Module):
         return self.core_loss_func(predicted_frames, target)
 
 
-# Residual block for deeper modeling
-class Residual3DBlock(nn.Module):
-    def __init__(self, channels):
-        super().__init__()
-        self.conv = nn.Conv3d(channels, channels, kernel_size=3, padding=1)
-        self.relu = nn.ReLU()
+        # class FramePredictionModel(nn.Module):
+        #     """
+        #     Neural network for video frame prediction,
+        #     including training and prediction functionalities.
+        #     """
+        #     def __init__(self, patch_size=16, num_input_frames=10, num_label_frames=1, dim=256, num_heads=4, num_layers=4, device="cpu", learning_rate=0.001):
+        #         """
+        #         Initializes the model architecture along with training utilities.
+        #         """
+        #         super().__init__()
+        #         self.device = device
 
-    def forward(self, x):
-        return self.relu(self.conv(x) + x)  # Residual connection
+        #         self.frame_size = 64 # TODO: not hardcode
+
+        #         self.cnn_encoder = nn.Sequential(
+        #             nn.Conv3d(1, 32, kernel_size=(3,3,3), padding=1),
+        #             nn.ReLU(),
+        #             nn.Conv3d(32, 64, kernel_size=(3,3,3), padding=1),
+        #             nn.ReLU(),
+        #         )
+        #         self.patch_embed = nn.Conv3d(64, dim, kernel_size=(1, patch_size, patch_size), stride=(1, patch_size, patch_size))
+        #         self.transformer = nn.Transformer(dim, num_heads, num_layers, batch_first=True)
+        #         self.decoder = nn.Sequential(
+        #             nn.ConvTranspose3d(dim, 64, kernel_size=(1, patch_size, patch_size), stride=(1, patch_size, patch_size)),
+        #             nn.ReLU(),
+        #             nn.Conv3d(64, 1, kernel_size=(3,3,3), padding=1)
+        #         )
+
+        #         self.loss_fn = RecursivePredictionLoss(self.predict_future_frames, num_input_frames=num_input_frames, num_label_frames=num_label_frames)
+        #         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
+        #         self.to(device)
+
+        #     def forward(self, x):
+        #         """Defines the forward pass of the model."""
+        #         x = self.cnn_encoder(x)  # CNN for spatial feature extraction
+        #         x = self.patch_embed(x)  # Convert feature maps into patches
+        #         x = x.flatten(2).permute(2, 0, 1)  # Reshape for Transformer
+        #         x = self.transformer(x, x)  # Transformer for temporal dependencies
+        #         # x = x.permute(1, 2, 0).reshape(x.shape[1], 256, 10, self.frame_size, self.frame_size)  # Ensure 256 channels
+        #         # return self.decoder(x)  # Reconstruct frame
+
+        #         # print(f"Shape after transformer: {x.shape}")  # Debugging step
+        #         # batch_size, seq_len, features = x.shape  # Extract actual dimensions
+        #         # x = x.reshape(batch_size, features, 10, self.frame_size, self.frame_size)  # Adjust dynamically
+
+        #         batch_size, seq_len, features = x.shape  # Extract dimensions
+        #         x = x.permute(1, 2, 0).reshape(batch_size, features, seq_len, 1, 1)  # Reshape based on actual size
+
+        #         x = self.decoder(x)
+
+        #         print(f"Shape after decoder: {x.shape}")  # Shape after decoder: torch.Size([160, 1, 8, 16, 16])
 
 
-class VideoConv3D(nn.Module):
+        #         return x
+
+
+class FramePredictionModel(nn.Module):
     """
     A 3D convolutional neural network model for video frame prediction,
     including training and prediction functionalities.
@@ -146,35 +203,57 @@ class VideoConv3D(nn.Module):
         super().__init__()
         self.device = device
 
-        a, b = 128, 256
-        
-        # Encoder with residual blocks
+        self.num_input_frames = num_input_frames
+        self.num_label_frames = num_label_frames
+
+        a = 16
+        b = 32
+
+        # 3D Convolutional layers
         self.encoder = nn.Sequential(
-            nn.Conv3d(input_channels, a, kernel_size=(3,3,3), stride=1, padding=1),
+            nn.Conv3d(input_channels, a, kernel_size=(3, 3, 3), stride=1, padding=1),
             nn.ReLU(),
-            # Residual3DBlock(a),
-            nn.Conv3d(a, b, kernel_size=(3,3,3), stride=1, padding=1),
+            nn.Conv3d(a, b, kernel_size=(3, 3, 3), stride=1, padding=1),
             nn.ReLU(),
-            # Residual3DBlock(b)
         )
         
-        # Bottleneck: 
-        self.bottleneck = nn.Sequential(
-            nn.Conv3d(b, b, kernel_size=(3,3,3), stride=1, padding=1),  # Smaller kernel
-            nn.ReLU(),
-        )
-
-        # Decoder with upsampling
         self.decoder = nn.Sequential(
-            # Residual3DBlock(b),
-            nn.Conv3d(b, a, kernel_size=(3,3,3), stride=1, padding=1),
+            nn.Conv3d(b, a, kernel_size=(3, 3, 3), stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv3d(a, a, kernel_size=(3,3,3), stride=1, padding=1),
-            nn.ReLU(),
-            nn.Conv3d(a, output_channels, kernel_size=(num_input_frames, 3, 3), stride=(num_input_frames, 1, 1), padding=(0, 1, 1))
+            nn.Conv3d(a, output_channels, kernel_size=(num_input_frames, 3, 3), stride=(num_input_frames, 1, 1), padding=(0, 1, 1)),
         )
 
-        self.loss_fn = RecursivePredictionLoss(self.predict_future_frames, num_input_frames=num_input_frames, num_label_frames=num_label_frames)
+
+        # a, b = 128, 256
+        
+        # # Encoder with residual blocks
+        # self.encoder = nn.Sequential(
+        #     nn.Conv3d(input_channels, a, kernel_size=(3,3,3), stride=1, padding=1),
+        #     nn.ReLU(),
+        #     # Residual3DBlock(a),
+        #     nn.Conv3d(a, b, kernel_size=(3,3,3), stride=1, padding=1),
+        #     nn.ReLU(),
+        #     # Residual3DBlock(b)
+        # )
+        
+        # # # Bottleneck: 
+        # # self.bottleneck = nn.Sequential(
+        # #     nn.Conv3d(b, b, kernel_size=(3,3,3), stride=1, padding=1),  # Smaller kernel
+        # #     nn.ReLU(),
+        # # )
+
+        # # Decoder with upsampling
+        # self.decoder = nn.Sequential(
+        #     # Residual3DBlock(b),
+        #     nn.Conv3d(b, a, kernel_size=(3,3,3), stride=1, padding=1),
+        #     nn.ReLU(),
+        #     nn.Conv3d(a, a, kernel_size=(3,3,3), stride=1, padding=1),
+        #     nn.ReLU(),
+        #     nn.Conv3d(a, output_channels, kernel_size=(num_input_frames, 3, 3), stride=(num_input_frames, 1, 1), padding=(0, 1, 1))
+        # )
+
+        self.loss_fn = RecursivePredictionLoss(self.predict_future_frames, num_input_frames=self.num_input_frames, num_label_frames=self.num_label_frames)
+        # self.loss_fn = nn.MSELoss()
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         self.to(device)
 
@@ -202,7 +281,24 @@ class VideoConv3D(nn.Module):
                 with torch.autocast(device_type='cuda', dtype=torch.float16):
                     inputs = inputs.to(self.device, non_blocking=True)
                     targets = targets.to(self.device, non_blocking=True)
-                    loss = self.loss_fn(inputs, targets)
+                    loss = self.loss_fn(inputs, targets) # MODIFIED
+
+                    print(np.shape(inputs))
+                    print(np.shape(targets))
+                    print(np.shape(self(inputs)))
+
+                    # I/O here:
+                    # torch.Size([10, 1, 10, 64, 64])
+                    # torch.Size([10, 1, 64, 64])
+
+
+
+                    # for f in inputs[0][0].cpu().numpy():
+                    #     Recording.frame_printer(f)
+                    #     time.sleep(.01)
+
+
+                    # Recording.frame_printer(targets[0][0][0].cpu().numpy())
 
                 scaler.scale(loss).backward()
                 scaler.step(self.optimizer)
@@ -219,21 +315,20 @@ class VideoConv3D(nn.Module):
 
             print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss / len(dataloader):.8f}")
 
-    def predict_future_frames(self, initial_frames, num_future_frames):
+    def predict_future_frames(self, input_frames, num_future_frames, with_grad=True):
         """
-        Generates future frames recursively while maintaining differentiability.
+        Generates future frames recursively.
         Uses the model's own predictions as input for future time steps.
         """
 
-        input_frames = initial_frames  # Assume correct shape (batch_size, 1, num_frames, 82, 82)
         predicted_frames = []
 
-        with torch.set_grad_enabled(self.training):  # Enable gradients only during training
+        with torch.set_grad_enabled(with_grad):  # Enable gradients only during training
             for _ in range(num_future_frames):
                 next_frame = self(input_frames)  # Model prediction
-                predicted_frames.append(next_frame.unsqueeze(2))  # Keep as tensor
+                predicted_frames.append(next_frame.unsqueeze(2))
 
-                # Prepare next input: remove first frame, append new frame
+                # Prepare next input: remove first frame, concatenate new frame
                 input_frames = torch.cat((input_frames[:, :, 1:, :, :], next_frame.unsqueeze(2)), dim=2)  # Maintain correct shape
 
         # Stack along the time dimension to form (batch_size, 1, num_future_frames, 82, 82)
@@ -243,9 +338,33 @@ class VideoConv3D(nn.Module):
 
     def predict_future_frames_testing(self, initial_frames, num_future_frames):
         """
+        predict future frames, but for testing the model instead of training
+        """
+
+        self.eval()
+
+        # get frames in correct shape
+        initial_frames = initial_frames[:self.num_input_frames]
+        input_frames = torch.tensor(initial_frames, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
+
+        # get prediction and return it to normal memory
+        prediction = self.predict_future_frames(input_frames, num_future_frames, with_grad=False).squeeze(0).squeeze(0)
+        print(np.shape(prediction))
+        return prediction.cpu().numpy()
+
+
+    def predict_future_frames_testingOLD(self, initial_frames, num_future_frames):
+        """
         Generates future frames based on the initial input frames.
         """
+
+        # I/O here:
+        # torch.Size([1, 1, 21, 64, 64])
+        # torch.Size([1, 1, 2, 64, 64])
+
+        print(np.shape(initial_frames))
         self.eval()
+        initial_frames = initial_frames[:self.num_input_frames]
         input_frames = torch.tensor(initial_frames, dtype=torch.float32, device=self.device).unsqueeze(0).unsqueeze(0)
 
         print(np.shape(input_frames))
@@ -254,6 +373,8 @@ class VideoConv3D(nn.Module):
         with torch.no_grad():
             for _ in range(num_future_frames):
                 next_frame = self(input_frames).squeeze().cpu().numpy()
+                print(np.shape(self(input_frames)))
+
                 predicted_frames.append(next_frame)
                 input_frames = torch.cat(
                     (input_frames[:, :, 1:, :, :], torch.tensor(next_frame, dtype=torch.float32, device=self.device)
@@ -271,9 +392,9 @@ class VideoConv3D(nn.Module):
         torch.save(self.state_dict(), save_file)
 
     @staticmethod
-    def load_model(path, input_channels=1, output_channels=1, num_input_frames=10, num_label_frames=1, device="cpu"):
+    def load_model(path, num_input_frames=10, num_label_frames=1, device="cpu"):
         """Loads a saved model from disk."""
-        model = VideoConv3D(input_channels, output_channels, num_input_frames, num_label_frames, device)
+        model = FramePredictionModel(num_input_frames=num_input_frames, num_label_frames=num_label_frames, device=device)
         model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
         return model.to(device)
 
@@ -283,30 +404,27 @@ def main_train(use_stored_model=None):
     """
 
     _num_input_frames = 10
-    _num_label_frames = 10
+    _num_label_frames = 1
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = VideoDataset(device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
-    dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
 
     if use_stored_model:
         model_path = utils.get_most_recent_model()
         print(f"Training model found at {model_path}")
-        model = VideoConv3D.load_model(model_path, num_input_frames = _num_input_frames, num_label_frames=_num_label_frames, device=device)
+        model = FramePredictionModel.load_model(model_path, num_input_frames = _num_input_frames, num_label_frames=_num_label_frames, device=device)
     else: 
-        model = VideoConv3D(device=device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
+        model = FramePredictionModel(device=device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
 
 
     # TODO: This is user I/O. probably best to move it all to the main file
     try: 
-        print('started training process')
-        model.train_model(dataloader, num_epochs=1)
-    except Exception as e:
-        do_save = input(f"Exception encountered! {e} \n\n Would you like to save the model anyways? \"YES\" to save") == "YES"
-        if do_save:
-            model_save_path = utils.get_model_folder()
-            model.save_model(model_save_path)
-        else:
+        print('Started training process')
+        model.train_model(dataloader, num_epochs=10000)
+    except KeyboardInterrupt:
+        do_save = input(f"\n\nTraining stopped!\n\n    Would you like to save the model anyways? \"SAVE\" to save; Enter to discard: ") == "SAVE"
+        if not do_save:
             return
 
     model_save_path = utils.get_model_folder()
@@ -319,12 +437,12 @@ def main_predict(seed_frames, num_future_frames=10):
     """
 
     _num_input_frames = 10
-    _num_label_frames = 10
+    _num_label_frames = 1
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_path = utils.get_most_recent_model()
     print(f"Running model found at {model_path}")
 
-    model = VideoConv3D.load_model(model_path, num_input_frames = _num_input_frames, num_label_frames=_num_label_frames, device=device)
+    model = FramePredictionModel.load_model(model_path, num_input_frames = _num_input_frames, num_label_frames=_num_label_frames, device=device)
     future_frames = model.predict_future_frames_testing(seed_frames, num_future_frames)
     return future_frames

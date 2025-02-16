@@ -32,7 +32,7 @@ def main():
     elif args.mode == 'trainer':
         train_model()
     elif args.mode == 'predictor':
-        predict()
+        predict('0')
     elif args.mode == 'playback':
         playback_recording()
     elif args.mode == 'auto_idiot':
@@ -41,7 +41,7 @@ def main():
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
-def generate_data(num_sims=500, sim_time=20, clear_prev_data=True):
+def generate_data(num_sims=1, sim_time=2.1, clear_prev_data=True):
     """
     generate data for training
 
@@ -70,26 +70,39 @@ def train_model(use_stored_model=False):
     print("Training model")
     main_train(use_stored_model)
 
-def predict():
+def predict(file=None):
     print("Predicting future frames")
 
-    _, recording = BatchProcessor.run_single_simulation(0,1)
-    print(np.shape(recording.frame_sequence))
+    if file is None:
+        _, recording = BatchProcessor.run_single_simulation(0,10)
+    else:
+
+        for data_file in utils.get_data_folder().iterdir():
+            if data_file.suffix == ".npz" and str(file) in str(data_file):
+                recording = Recording()
+                recording.init_from_file(data_file)
+                break
+        
 
     predicted_frames = main_predict(recording.get_float_frame_seq(), 100)
-    # print(np.size(recording.get_float_frame_seq()))
-    recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames))
-    # recording._frame_sequence = predicted_frames[0:1] #
-    # recording._frame_sequence = predicted_frames # TODO: super jank, but saves the fps data soooo who cares for now
 
-    recording.fps = 2
+    # TODO: super jank, but saves the fps data soooo who cares for now
+
+    # recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames)) # append the real and predicted
+    recording._frame_sequence = predicted_frames[0:1] # just the first frame
+    # recording._frame_sequence = predicted_frames # all the predicted
+
+    recording.fps = .001
 
     player = SimulationPlayer(800, 800)
     # time.sleep(2)
     player.play(recording)
 
+
+
+
 # this is temp and this is trash code
-def playback_recording(rec_num=9):
+def playback_recording(rec_num=0):
     print("Playing recording")
 
     recs = []
