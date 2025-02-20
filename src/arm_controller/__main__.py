@@ -74,7 +74,7 @@ def predict(file=None):
     print("Predicting future frames")
 
     if file is None:
-        _, recording = BatchProcessor.run_single_simulation(0,1)
+        _, recording = BatchProcessor.run_single_simulation(0,2)
     else:
 
         for data_file in utils.get_data_folder().iterdir():
@@ -87,7 +87,7 @@ def predict(file=None):
 
     # TODO: super jank, but saves the fps data soooo who cares for now
 
-    recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames)) # append the real and predicted
+    recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence)[-3:], predicted_frames)) # append the real and predicted
     # recording._frame_sequence = predicted_frames[0:1] # just the first frame
     # recording._frame_sequence = predicted_frames # all the predicted
 
@@ -158,5 +158,32 @@ Same as before, except 32 and 64 model: Epoch [7146/10000] Progress: 0%, Loss: 0
 
 with 10 label frames: Epoch [6067/10000] Progress: 0%, Loss: 0.004137696232646704
     Looks better than before for a little bit longer now
+
+    
+
+I had a random idea, but can't seem to find anything on it (probably because I do not know what to google). 
+Has anyone tried using diffusion models with only partially adding noise to an image? 
+I'm thinking in terms of combining a diffusion policy with a physics simulation.
+
+You'd be able to 'ground' the output of the network - because the physics simulation has pretty okay results in the short term - you can ground your output 
+by not adding noise to the known ouput of the network - or even leave some noise based on how confident the physics result is
+
+Then you can leave the important parts of the image fully noisy - this would allow for the model to generate from scratch
+in the areas where there is a lot of noise, while leaving behind the areas that the physics engine took care of
+
+maybe this is faster and more grounded - then your planning and manipulation and everything that your diffusion policy does can be 
+physically grounded by a sim - a great benefit of an MPC - while having the excellent generative abilities and creative hallucinations of a large model
+
+
+What I have tried so far: 
+    Small, Medium, and Larger auto-encoder CNN
+
+What others have done in the past for similar problems:
+    Conv-LSTMs
+
+What I want to do in the future:
+    diffusion transformer!
+
+
 
 """

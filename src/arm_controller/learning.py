@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
+import torch.nn.functional as F
 from . import utils
 import numpy as np
 from os import listdir
@@ -15,7 +16,7 @@ class VideoDataset(Dataset):
     A dataset class for handling video recordings and preparing input-output pairs
     for training and testing deep learning models.
     """
-    def __init__(self, device, num_input_frames, num_label_frames=10, recordings=None):
+    def __init__(self, device, num_input_frames, num_label_frames, recordings=None):
         """
         Initializes the dataset by loading or processing video recordings.
         """
@@ -59,8 +60,8 @@ class VideoDataset(Dataset):
         frame_shape = example_frame.shape  # Assuming frames are NumPy arrays
         
         # Preallocate arrays
-        data_array = np.empty((total_frames, self.num_input_frames, *frame_shape), dtype=np.float32)
-        label_array = np.empty((total_frames, self.num_label_frames, *frame_shape), dtype=np.float32)
+        data_array = np.empty((total_frames, self.num_input_frames, *frame_shape), dtype=np.uint8)
+        label_array = np.empty((total_frames, self.num_label_frames, *frame_shape), dtype=np.uint8)
 
         index = 0
         for num, rec in enumerate(self.recordings):
@@ -81,18 +82,6 @@ class VideoDataset(Dataset):
             print(f"data array size: {data_array.shape}")
             print(f"labels array size: {label_array.shape}")
             raise Exception("index suggests that array size is wrong")
-        
-        # print(np.shape(self.recordings[0].get_float_frame_seq()))
-        # print(len(self.data))
-        # print(len(self.labels))
-        # print(f"data array size: {data_array.shape}")
-        # print(f"labels array size: {label_array.shape}")
-
-        # for frame in np.array(self.data[0].cpu().numpy()):
-        #     Recording.frame_printer(frame)
-
-        # time.sleep(10)
-
 
     def __len__(self):
         """Returns the total number of samples in the dataset."""
@@ -100,21 +89,10 @@ class VideoDataset(Dataset):
 
     def __getitem__(self, idx):
         """Retrieves the sample at the given index.""" 
-        x = self.data[idx].unsqueeze(0).to(self.device, non_blocking=True) / 255.0 # TODO: get this number from somewhere instead of this hardcoded bs
-        y = self.labels[idx].unsqueeze(0).to(self.device, non_blocking=True) / 255.0
+        x = self.data[idx].to(torch.float32).unsqueeze(0).to(self.device, non_blocking=True) / 255.0 # TODO: get this number from somewhere instead of this hardcoded bs
+        y = self.labels[idx].to(torch.float32).unsqueeze(0).to(self.device, non_blocking=True) / 255.0
 
         return x, y # (Batch DataPoint x Channels x frame_count x H x W) , (Label)
-
-class WeightedMSELossOLD(nn.Module):
-    def __init__(self, weight=10.0):
-        super().__init__()
-        self.weight = weight
-        self.mse = nn.MSELoss()
-
-    def forward(self, pred, target):
-        weight_mask = torch.where(target > 0.1, self.weight, 1.0)  # Increase weight for bright areas
-        loss = self.mse(pred * weight_mask, target * weight_mask)
-        return loss
 
 
 class RecursivePredictionLoss(nn.Module):
@@ -134,162 +112,91 @@ class RecursivePredictionLoss(nn.Module):
         predicted_frames = self.prediction_func(inputs, self.num_label_frames)
         return self.core_loss_func(predicted_frames, target)
 
+class DoubleConv3D(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(DoubleConv3D, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv3d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True),
+        )
 
-        # class FramePredictionModel(nn.Module):
-        #     """
-        #     Neural network for video frame prediction,
-        #     including training and prediction functionalities.
-        #     """
-        #     def __init__(self, patch_size=16, num_input_frames=10, num_label_frames=1, dim=256, num_heads=4, num_layers=4, device="cpu", learning_rate=0.001):
-        #         """
-        #         Initializes the model architecture along with training utilities.
-        #         """
-        #         super().__init__()
-        #         self.device = device
-
-        #         self.frame_size = 64 # TODO: not hardcode
-
-        #         self.cnn_encoder = nn.Sequential(
-        #             nn.Conv3d(1, 32, kernel_size=(3,3,3), padding=1),
-        #             nn.ReLU(),
-        #             nn.Conv3d(32, 64, kernel_size=(3,3,3), padding=1),
-        #             nn.ReLU(),
-        #         )
-        #         self.patch_embed = nn.Conv3d(64, dim, kernel_size=(1, patch_size, patch_size), stride=(1, patch_size, patch_size))
-        #         self.transformer = nn.Transformer(dim, num_heads, num_layers, batch_first=True)
-        #         self.decoder = nn.Sequential(
-        #             nn.ConvTranspose3d(dim, 64, kernel_size=(1, patch_size, patch_size), stride=(1, patch_size, patch_size)),
-        #             nn.ReLU(),
-        #             nn.Conv3d(64, 1, kernel_size=(3,3,3), padding=1)
-        #         )
-
-        #         self.loss_fn = RecursivePredictionLoss(self.predict_future_frames, num_input_frames=num_input_frames, num_label_frames=num_label_frames)
-        #         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
-        #         self.to(device)
-
-        #     def forward(self, x):
-        #         """Defines the forward pass of the model."""
-        #         x = self.cnn_encoder(x)  # CNN for spatial feature extraction
-        #         x = self.patch_embed(x)  # Convert feature maps into patches
-        #         x = x.flatten(2).permute(2, 0, 1)  # Reshape for Transformer
-        #         x = self.transformer(x, x)  # Transformer for temporal dependencies
-        #         # x = x.permute(1, 2, 0).reshape(x.shape[1], 256, 10, self.frame_size, self.frame_size)  # Ensure 256 channels
-        #         # return self.decoder(x)  # Reconstruct frame
-
-        #         # print(f"Shape after transformer: {x.shape}")  # Debugging step
-        #         # batch_size, seq_len, features = x.shape  # Extract actual dimensions
-        #         # x = x.reshape(batch_size, features, 10, self.frame_size, self.frame_size)  # Adjust dynamically
-
-        #         batch_size, seq_len, features = x.shape  # Extract dimensions
-        #         x = x.permute(1, 2, 0).reshape(batch_size, features, seq_len, 1, 1)  # Reshape based on actual size
-
-        #         x = self.decoder(x)
-
-        #         print(f"Shape after decoder: {x.shape}")  # Shape after decoder: torch.Size([160, 1, 8, 16, 16])
-
-
-        #         return x
-
+    def forward(self, x):
+        return self.conv(x)
 
 class FramePredictionModel(nn.Module):
-    """
-    A 3D convolutional neural network model for video frame prediction,
-    including training and prediction functionalities.
-    """
-    def __init__(self, input_channels=1, output_channels=1, num_input_frames=10, num_label_frames=1, device="cpu", learning_rate=0.001):
-        """
-        Initializes the 3D CNN model architecture along with training utilities.
-        """
-        super().__init__()
-        self.device = device
 
+    def __init__(self, num_input_frames, num_label_frames, features=[32, 64, 128, 256], device="cpu", learning_rate=0.001):
+        super().__init__()
+
+        in_channels, out_channels = 1, 1
+
+        self.pool = nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2))  # Pool across all dimensions
+
+        self.downs = nn.ModuleList()
+        self.ups = nn.ModuleList()
+
+        # Down-sampling (Encoder)
+        for feature in features:
+            self.downs.append(DoubleConv3D(in_channels, feature))
+            in_channels = feature
+
+        # Bottleneck
+        self.bottleneck = DoubleConv3D(features[-1], features[-1] * 2)
+
+        # Up-sampling (Decoder)
+        for feature in reversed(features):
+            self.ups.append(nn.ConvTranspose3d(feature * 2, feature, kernel_size=(2, 2, 2), stride=(2, 2, 2)))
+            self.ups.append(DoubleConv3D(feature * 2, feature))
+
+        # Additional Conv3D layers to squeeze temporal dimension to 1
+        self.final_conv_layers = nn.Sequential(
+            nn.Conv3d(features[0], features[0] // 2, kernel_size=(3, 3, 3), stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(features[0] // 2, out_channels, kernel_size=(3, 3, 3), stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(out_channels, out_channels, kernel_size=(num_input_frames, 1, 1), stride=(num_input_frames, 1, 1))  # Final squeeze
+        )
+
+
+        self.device = device
         self.num_input_frames = num_input_frames
         self.num_label_frames = num_label_frames
-
-        # a = 32
-        # b = 64
-
-        # kern_size = (5,3,3)
-
-        # # 3D Convolutional layers
-        # self.encoder = nn.Sequential(
-        #     nn.Conv3d(input_channels, a, kernel_size=kern_size, stride=1, padding=1),
-        #     nn.ReLU(),
-        #     nn.Conv3d(a, b, kernel_size=kern_size, stride=1, padding=1),
-        #     nn.ReLU(),
-        # )
-        
-
-        # output_kern_size = (num_input_frames, 3, 3)
-        # self.decoder = nn.Sequential(
-        #     nn.Conv3d(b, a, kernel_size=kern_size, stride=1, padding=1),
-        #     nn.ReLU(),
-        #     nn.Conv3d(a, output_channels, kernel_size=output_kern_size, stride=(num_input_frames, 1, 1), padding=(0, 1, 1)),
-        # )
-
-
-        a = 32
-        b = 64
-
-        kern_size = (3, 3, 3)  # (Temporal, Height, Width)
-        padding = (2, 1, 1)    # Ensures spatial dimensions remain constant
-
-        # Encoder
-        self.encoder = nn.Sequential(
-            nn.Conv3d(input_channels, a, kernel_size=kern_size, stride=1, padding=padding),
-            nn.ReLU(),
-            nn.Conv3d(a, b, kernel_size=kern_size, stride=1, padding=padding),
-            nn.ReLU(),
-        )
-
-        # Decoder
-        output_kern_size = (num_input_frames, 3, 3)  # Match input frame count in temporal dim
-        self.decoder = nn.Sequential(
-            nn.Conv3d(b, a, kernel_size=(5,3,3), stride=1, padding=(2,1,1)),
-            nn.ReLU(),
-            nn.Conv3d(a, output_channels, kernel_size=output_kern_size, 
-                      stride=(num_input_frames, 1, 1), padding=(0, 1, 1)),  # Keep stride as required
-        )
-
-
-        # a, b = 128, 256
-        
-        # # Encoder with residual blocks
-        # self.encoder = nn.Sequential(
-        #     nn.Conv3d(input_channels, a, kernel_size=(3,3,3), stride=1, padding=1),
-        #     nn.ReLU(),
-        #     # Residual3DBlock(a),
-        #     nn.Conv3d(a, b, kernel_size=(3,3,3), stride=1, padding=1),
-        #     nn.ReLU(),
-        #     # Residual3DBlock(b)
-        # )
-        
-        # # # Bottleneck: 
-        # # self.bottleneck = nn.Sequential(
-        # #     nn.Conv3d(b, b, kernel_size=(3,3,3), stride=1, padding=1),  # Smaller kernel
-        # #     nn.ReLU(),
-        # # )
-
-        # # Decoder with upsampling
-        # self.decoder = nn.Sequential(
-        #     # Residual3DBlock(b),
-        #     nn.Conv3d(b, a, kernel_size=(3,3,3), stride=1, padding=1),
-        #     nn.ReLU(),
-        #     nn.Conv3d(a, a, kernel_size=(3,3,3), stride=1, padding=1),
-        #     nn.ReLU(),
-        #     nn.Conv3d(a, output_channels, kernel_size=(num_input_frames, 3, 3), stride=(num_input_frames, 1, 1), padding=(0, 1, 1))
-        # )
-
         self.loss_fn = RecursivePredictionLoss(self.predict_future_frames, num_input_frames=self.num_input_frames, num_label_frames=self.num_label_frames)
         # self.loss_fn = nn.MSELoss()
         self.optimizer = optim.Adam(self.parameters(), lr=learning_rate)
         self.to(device)
 
     def forward(self, x):
-        """Defines the forward pass of the model."""
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x.squeeze(2)
+        skip_connections = []
+
+        # Encoder (Downsampling)
+        for down in self.downs:
+            x = down(x)
+            skip_connections.append(x)
+            x = self.pool(x)
+
+        x = self.bottleneck(x)
+        skip_connections = skip_connections[::-1]  # Reverse for decoding
+
+        # Decoder (Upsampling)
+        for idx in range(0, len(self.ups), 2):
+            x = self.ups[idx](x)
+            skip_connection = skip_connections[idx // 2]
+
+            # Ensure tensor sizes match for concatenation
+            if x.shape != skip_connection.shape:
+                x = F.interpolate(x, size=skip_connection.shape[2:], mode="trilinear", align_corners=False)
+
+            x = torch.cat((skip_connection, x), dim=1)
+            x = self.ups[idx + 1](x)
+
+        # Apply final layers to squeeze temporal dimension to 1
+        x = self.final_conv_layers(x)  # Shape: (batch, channels, 1, H, W)
+        return x.squeeze(2)  # Remove the temporal dimension
 
     def train_model(self, dataloader, num_epochs=10):
         """
@@ -311,22 +218,9 @@ class FramePredictionModel(nn.Module):
                     targets = targets.to(self.device, non_blocking=True)
                     loss = self.loss_fn(inputs, targets) # MODIFIED
 
-                    # print(np.shape(inputs))
-                    # print(np.shape(targets))
-                    # print(np.shape(self(inputs)))
-
-                    # # I/O here:
-                    # # torch.Size([10, 1, 10, 64, 64])
-                    # # torch.Size([10, 1, 64, 64])
-
-
-
-                    # # for f in inputs[0][0].cpu().numpy():
-                    # #     Recording.frame_printer(f)
-                    # #     time.sleep(.01)
-
-
-                    # # Recording.frame_printer(targets[0][0][0].cpu().numpy())
+                    # print(f"input size: {np.shape(inputs)}")
+                    # print(f"target size: {np.shape(targets)}")
+                    # print(f"output size: {np.shape(output)}")
 
                 scaler.scale(loss).backward()
                 scaler.step(self.optimizer)
@@ -402,8 +296,8 @@ def main_train(use_stored_model=None):
     Builds the model, prepares the dataset, and trains the model.
     """
 
-    _num_input_frames = 10
-    _num_label_frames = 10
+    _num_input_frames = 16
+    _num_label_frames = 1
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = VideoDataset(device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
@@ -435,7 +329,7 @@ def main_predict(seed_frames, num_future_frames=10):
     Loads a trained model and generates future frames given a seed frame.
     """
 
-    _num_input_frames = 10
+    _num_input_frames = 16
     _num_label_frames = 10
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

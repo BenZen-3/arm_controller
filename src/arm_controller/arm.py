@@ -32,6 +32,24 @@ how can and input sequence be leveraged as 'learning a task'
     like if i add a sequence to my prompt as an example of the skill completion - that could be helpful
     then you only need one example or very few examples of skill completion
 
+    
+    
+--- Another Random Idea --- 
+I had a random idea, but can't seem to find anything on it (probably because I do not know what to google). 
+Has anyone tried using diffusion models with only partially adding noise to an image? 
+I'm thinking in terms of combining a diffusion policy with a physics simulation.
+
+You'd be able to 'ground' the output of the network - because the physics simulation has pretty okay results in the short term - you can ground your output 
+by not adding noise to the known ouput of the network - or even leave some noise based on how confident the physics result is
+
+Then you can leave the important parts of the image fully noisy - this would allow for the model to generate from scratch
+in the areas where there is a lot of noise, while leaving behind the areas that the physics engine took care of
+
+maybe this is faster and more grounded - then your planning and manipulation and everything that your diffusion policy does can be 
+physically grounded by a sim - a great benefit of an MPC - while having the excellent generative abilities and creative hallucinations of a large model
+
+
+
 """
 
 class Arm():
