@@ -112,6 +112,7 @@ class RecursivePredictionLoss(nn.Module):
         predicted_frames = self.prediction_func(inputs, self.num_label_frames)
         return self.core_loss_func(predicted_frames, target)
 
+
 class DoubleConv3D(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(DoubleConv3D, self).__init__()
@@ -126,6 +127,7 @@ class DoubleConv3D(nn.Module):
 
     def forward(self, x):
         return self.conv(x)
+
 
 class FramePredictionModel(nn.Module):
 
@@ -160,7 +162,6 @@ class FramePredictionModel(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv3d(out_channels, out_channels, kernel_size=(num_input_frames, 1, 1), stride=(num_input_frames, 1, 1))  # Final squeeze
         )
-
 
         self.device = device
         self.num_input_frames = num_input_frames
@@ -297,7 +298,7 @@ def main_train(use_stored_model=None):
     """
 
     _num_input_frames = 16
-    _num_label_frames = 1
+    _num_label_frames = 4
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = VideoDataset(device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
@@ -330,7 +331,7 @@ def main_predict(seed_frames, num_future_frames=10):
     """
 
     _num_input_frames = 16
-    _num_label_frames = 10
+    _num_label_frames = 4
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_path = utils.get_most_recent_model()

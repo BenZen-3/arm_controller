@@ -74,7 +74,7 @@ def predict(file=None):
     print("Predicting future frames")
 
     if file is None:
-        _, recording = BatchProcessor.run_single_simulation(0,2)
+        _, recording = BatchProcessor.run_single_simulation(0,1.6)
     else:
 
         for data_file in utils.get_data_folder().iterdir():
@@ -83,19 +83,19 @@ def predict(file=None):
                 recording.init_from_file(data_file)
                 break
 
-    predicted_frames = main_predict(recording.get_float_frame_seq(), 100)
+    predicted_frames = main_predict(recording.get_float_frame_seq(), 1000)
 
     # TODO: super jank, but saves the fps data soooo who cares for now
 
-    recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence)[-3:], predicted_frames)) # append the real and predicted
+    recording._frame_sequence = np.concatenate((np.copy(recording.frame_sequence), predicted_frames)) # append the real and predicted
     # recording._frame_sequence = predicted_frames[0:1] # just the first frame
     # recording._frame_sequence = predicted_frames # all the predicted
 
-    recording.fps = 2
+    # recording.fps = 2
     # recording.fps = .001
 
     player = SimulationPlayer(800, 800)
-    # time.sleep(2)
+    # time.sleep(10)
     player.play(recording)
 
 
@@ -125,7 +125,7 @@ def auto_idiot():
 
     num_runs = 100
     
-    num_sims = 200
+    num_sims = 500
     sim_time = 20
 
     for i in range(num_runs):
