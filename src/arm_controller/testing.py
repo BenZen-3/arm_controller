@@ -1,252 +1,81 @@
-# # import torch
-# # import torch.nn as nn
-# # import torchvision.transforms.functional as TF
+# import time
 
-# # # SOURCE: https://github.com/aladdinpersson/Machine-Learning-Collection/blob/master/ML/Pytorch/image_segmentation/semantic_segmentation_unet/model.py
+# true_start = time.time()
 
-# # class DoubleConv(nn.Module):
-# #     def __init__(self, in_channels, out_channels):
-# #         super(DoubleConv, self).__init__()
-# #         self.conv = nn.Sequential(
-# #             nn.Conv2d(in_channels, out_channels, 3, 1, 1, bias=False),
-# #             nn.BatchNorm2d(out_channels),
-# #             nn.ReLU(inplace=True),
-# #             nn.Conv2d(out_channels, out_channels, 3, 1, 1, bias=False),
-# #             nn.BatchNorm2d(out_channels),
-# #             nn.ReLU(inplace=True),
-# #         )
+# from sentence_transformers import SentenceTransformer
 
-# #     def forward(self, x):
-# #         return self.conv(x)
+# print(f"huh {time.time() - true_start}")
 
-# # class UNET(nn.Module):
-# #     def __init__(
-# #             self, in_channels=3, out_channels=1, features=[64, 128, 256, 512],
-# #     ):
-# #         super(UNET, self).__init__()
-# #         self.ups = nn.ModuleList()
-# #         self.downs = nn.ModuleList()
-# #         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+# start = time.time()
+# print('started')
+# # 1. Load a pretrained Sentence Transformer model
+# model = SentenceTransformer("all-MiniLM-L6-v2")
 
-# #         # Down part of UNET
-# #         for feature in features:
-# #             self.downs.append(DoubleConv(in_channels, feature))
-# #             in_channels = feature
+# print(f"model loaded at time {time.time() - start}")
 
-# #         # Up part of UNET
-# #         for feature in reversed(features):
-# #             self.ups.append(
-# #                 nn.ConvTranspose2d(
-# #                     feature*2, feature, kernel_size=2, stride=2,
-# #                 )
-# #             )
-# #             self.ups.append(DoubleConv(feature*2, feature))
+# # The sentences to encode
+# sentences = [
+#     "The weather is lovely today.",
+#     "It's so sunny outside!",
+#     "He drove to the stadium.",
+# ]
 
-# #         self.bottleneck = DoubleConv(features[-1], features[-1]*2)
-# #         self.final_conv = nn.Conv2d(features[0], out_channels, kernel_size=1)
+# # 2. Calculate embeddings by calling model.encode()
+# embeddings = model.encode(sentences)
+# print(embeddings.shape)
 
-# #     def forward(self, x):
-# #         skip_connections = []
+# print('end')
 
-# #         for down in self.downs:
-# #             x = down(x)
-# #             skip_connections.append(x)
-# #             x = self.pool(x)
+# # [3, 384]
 
-# #         x = self.bottleneck(x)
-# #         skip_connections = skip_connections[::-1]
-
-# #         for idx in range(0, len(self.ups), 2):
-# #             x = self.ups[idx](x)
-# #             skip_connection = skip_connections[idx//2]
-
-# #             if x.shape != skip_connection.shape:
-# #                 x = TF.resize(x, size=skip_connection.shape[2:])
-
-# #             concat_skip = torch.cat((skip_connection, x), dim=1)
-# #             x = self.ups[idx+1](concat_skip)
-
-# #         return self.final_conv(x)
-
-# # def test():
-# #     x = torch.randn((3, 1, 161, 161))
-# #     model = UNET(in_channels=1, out_channels=1)
-# #     preds = model(x)
-# #     assert preds.shape == x.shape
-
-# # if __name__ == "__main__":
-# #     test()
-# #     print('test complete')
+# # # 3. Calculate the embedding similarities
+# # similarities = model.similarity(embeddings, embeddings)
+# # print(similarities)
 
 
-# import torch
-# import torch.nn as nn
-# import torch.nn.functional as F
 
-# class DoubleConv3D(nn.Module):
-#     def __init__(self, in_channels, out_channels):
-#         super(DoubleConv3D, self).__init__()
-#         self.conv = nn.Sequential(
-#             nn.Conv3d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
-#             nn.BatchNorm3d(out_channels),
-#             nn.ReLU(inplace=True),
-#             nn.Conv3d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
-#             nn.BatchNorm3d(out_channels),
-#             nn.ReLU(inplace=True),
-#         )
+import numpy as np
 
-#     def forward(self, x):
-#         return self.conv(x)
+radius = 16
+num_points = 12
+angles = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
 
-# class UNet3D(nn.Module):
-#     def __init__(self, in_channels=1, out_channels=1, num_input_frames=10, features=[32, 64, 128, 256]):
-#         super(UNet3D, self).__init__()
-#         self.pool = nn.MaxPool3d(kernel_size=(1, 2, 2), stride=(1, 2, 2))  # Pooling only spatially
+# Calculate the points on the circle
+points = [(round(radius * np.cos(angle), 4), round(radius * np.sin(angle), 4)) for angle in angles]
 
-#         self.downs = nn.ModuleList()
-#         self.ups = nn.ModuleList()
+print(points)
 
-#         # Down-sampling (Encoder)
-#         for feature in features:
-#             self.downs.append(DoubleConv3D(in_channels, feature))
-#             in_channels = feature
+"""
+I am prompting an LLM with the following prompt. What would help improve this prompt to make a higher quality dataset?
 
-#         # Bottleneck
-#         self.bottleneck = DoubleConv3D(features[-1], features[-1] * 2)
+PROMPT:
 
-#         # Up-sampling (Decoder)
-#         for feature in reversed(features):
-#             self.ups.append(nn.ConvTranspose3d(feature * 2, feature, kernel_size=(1, 2, 2), stride=(1, 2, 2)))
-#             self.ups.append(DoubleConv3D(feature * 2, feature))
+Hello chat. I am training a small language conditioned diffusion model and I need to generate conditioned training data. The model predicts the movement of a 2DoF arm given text input. I would like you to help generate example text inputs and arm end effector positions in order to train this model.
 
-#         self.final_conv = nn.Conv3d(features[0], out_channels, kernel_size=1)
+Here are some rules that the generated data needs to follow. Please be sure to follow these rules. 
+1) The text prompt should be relevant to the arm's movement.
+2) The text prompt must be shorter than 256 word pieces in order to be processed by a language encoder.
+3) The text prompts should be varied and creative enough to provide a diverse dataset.
+4) The arm's speed is controllable in the range [1, 5] inclusive. 
+5) The coordinates are end effector positions and should be floats. X coordinate in range [-32, +32] and Y in [-32, +32], with unspecified units. 
+6) Although the acceptable coordinates span X [-32, 32] and Y [-32, 32], the arm has a more limited workspace. It is a 2DoF arm with maximum workspace radius of 30 units. For example, this would limit the arm to being unable to reach the point (25,25) due to the arm's limited reach. Please keep the coordinates inside the arm's workspace.
+6) End effector coordinate points will be linearly interpolated between. Density of points should be determined by spatial considerations, not temporal. A separate controller will drive the arm between the points, so point density should be determined by the effects of timing.
+7) The starting coordinate should be varied between prompts. The first coordinate in the list can be any point in the acceptable range and the desired motion should be fulfilled by the following coordinates. 
 
-#     def forward(self, x):
-#         skip_connections = []
+Here are three example responses. Please follow this format. Only respond with examples; do not respond with extra text. Thank you chat.
 
-#         # Encoder (Downsampling)
-#         for down in self.downs:
-#             x = down(x)
-#             skip_connections.append(x)
-#             x = self.pool(x)
+Example 1:
+Text prompt: "Arm moves to the right fast"
+Speed: 4
+Coordinate list: [(0,-10), (5,-10), (10,-10), (15,-10)]
 
-#         x = self.bottleneck(x)
-#         skip_connections = skip_connections[::-1]  # Reverse for decoding
+Example 2:
+Text prompt: "Move the arm in a circular motion with radius 16 units slowly"
+Speed: 2
+Coordinate list: [(16.0, 0.0), (13.8564, 8.0), (8.0, 13.8564), (0.0, 16.0), (-8.0, 13.8564), (-13.8564, 8.0), (-16.0, 0.0), (-13.8564, -8.0), (-8.0, -13.8564), (-0.0, -16.0), (8.0, -13.8564), (13.8564, -8.0)]
 
-#         # Decoder (Upsampling)
-#         for idx in range(0, len(self.ups), 2):
-#             x = self.ups[idx](x)
-#             skip_connection = skip_connections[idx // 2]
-
-#             # Ensure tensor sizes match for concatenation
-#             if x.shape != skip_connection.shape:
-#                 x = F.interpolate(x, size=skip_connection.shape[2:], mode="trilinear", align_corners=False)
-
-#             x = torch.cat((skip_connection, x), dim=1)
-#             x = self.ups[idx + 1](x)
-
-#         return self.final_conv(x).squeeze(2)  # Remove temporal dimension if needed
-
-# def test():
-#     num_input_frames = 10
-#     x = torch.randn((3, 1, num_input_frames, 64, 64))  # (batch, channels, time, height, width)
-#     model = UNet3D(in_channels=1, out_channels=1, num_input_frames=num_input_frames)
-#     preds = model(x)
-    
-#     assert preds.shape == (3, 1, num_input_frames, 64, 64), f"Expected shape {(3, 1, num_input_frames, 64, 64)}, but got {preds.shape}"
-
-# if __name__ == "__main__":
-#     test()
-#     print("Test complete")
-
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class DoubleConv3D(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(DoubleConv3D, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv3d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True),
-        )
-
-    def forward(self, x):
-        return self.conv(x)
-
-class UNet3D(nn.Module):
-    def __init__(self, in_channels=1, out_channels=1, num_input_frames=10, features=[32, 64, 128, 256]):
-        super(UNet3D, self).__init__()
-        self.pool = nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2))  # Pool across all dimensions
-
-        self.downs = nn.ModuleList()
-        self.ups = nn.ModuleList()
-
-        # Down-sampling (Encoder)
-        for feature in features:
-            self.downs.append(DoubleConv3D(in_channels, feature))
-            in_channels = feature
-
-        # Bottleneck
-        self.bottleneck = DoubleConv3D(features[-1], features[-1] * 2)
-
-        # Up-sampling (Decoder)
-        for feature in reversed(features):
-            self.ups.append(nn.ConvTranspose3d(feature * 2, feature, kernel_size=(2, 2, 2), stride=(2, 2, 2)))
-            self.ups.append(DoubleConv3D(feature * 2, feature))
-
-        # Additional Conv3D layers to squeeze temporal dimension to 1
-        self.final_conv_layers = nn.Sequential(
-            nn.Conv3d(features[0], features[0] // 2, kernel_size=(3, 3, 3), stride=1, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(features[0] // 2, out_channels, kernel_size=(3, 3, 3), stride=1, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(out_channels, out_channels, kernel_size=(num_input_frames, 1, 1), stride=(num_input_frames, 1, 1))  # Final squeeze
-        )
-
-    def forward(self, x):
-        skip_connections = []
-
-        # Encoder (Downsampling)
-        for down in self.downs:
-            x = down(x)
-            skip_connections.append(x)
-            x = self.pool(x)
-
-        x = self.bottleneck(x)
-        skip_connections = skip_connections[::-1]  # Reverse for decoding
-
-        # Decoder (Upsampling)
-        for idx in range(0, len(self.ups), 2):
-            x = self.ups[idx](x)
-            skip_connection = skip_connections[idx // 2]
-
-            # Ensure tensor sizes match for concatenation
-            if x.shape != skip_connection.shape:
-                x = F.interpolate(x, size=skip_connection.shape[2:], mode="trilinear", align_corners=False)
-
-            x = torch.cat((skip_connection, x), dim=1)
-            x = self.ups[idx + 1](x)
-
-        # Apply final layers to squeeze temporal dimension to 1
-        x = self.final_conv_layers(x)  # Shape: (batch, channels, 1, H, W)
-        return x.squeeze(2)  # Remove the temporal dimension
-
-def test():
-    num_input_frames = 16 # 16 is the MINIMUM NUMBER OF FRAMES
-    x = torch.randn((3, 1, num_input_frames, 64, 64))  # (batch, channels, time, height, width)
-    model = UNet3D(in_channels=1, out_channels=1, num_input_frames=num_input_frames)
-    preds = model(x)
-    
-    assert preds.shape == (3, 1, 64, 64), f"Expected shape {(3, 1, 64, 64)}, but got {preds.shape}"
-
-    print(preds.shape)
-
-if __name__ == "__main__":
-    test()
-    print("Test complete")
+Example 3:
+Text prompt: "Square with side lengths of 10 centered around the arm"
+Speed: 3
+Coordinate list: [(10,10), (10,-10), (-10,-10), (-10,10)]
+"""
