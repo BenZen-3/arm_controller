@@ -7,6 +7,7 @@ import re
 ENTRY_POINT = None
 DATA_FOLDER = "data/sim_data" # Holy god this should be a pathlike object
 MODEL_FOLDER = "data/model_data" # this too
+LLM_DATA_FOLDER = "data/llm_data" # yup
 
 def pretty_date():
     """
@@ -48,7 +49,7 @@ def clear_old_model():
     """
     delete the old model
     """
-    print("clear_old_model NOT IMPLEMENTED")
+    print("clear_old_model NOT IMPLEMENTED... printing because I assume this was an erroneous call")
 
 def get_model_folder():
     """
@@ -56,6 +57,13 @@ def get_model_folder():
     """
     global ENTRY_POINT, MODEL_FOLDER
     return ENTRY_POINT.joinpath(MODEL_FOLDER)
+
+def get_llm_data_folder():
+    """
+    get the folder that the llm data is in
+    """
+    global ENTRY_POINT, LLM_DATA_FOLDER
+    return ENTRY_POINT.joinpath(LLM_DATA_FOLDER)
 
 def get_most_recent_model():
     """
@@ -80,7 +88,6 @@ def get_most_recent_model():
 
     return most_recent_model
 
-            
 
 
 

@@ -6,7 +6,7 @@ import numpy as np
 
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
-from .simulator import BatchProcessor, Recording
+from .simulator import BatchProcessor, Recording, run_controller_sim
 from .learning import  main_train, main_predict
 from .player import SimulationPlayer
 from . import utils
@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description="Arm controller Package")
     parser.add_argument(
         '--mode', 
-        choices=['generator', 'trainer', 'predictor', 'playback', "auto_idiot"], 
+        choices=['generator', 'trainer', 'predictor', 'playback', "auto_idiot", "controller"], 
         default='generator',
         help='Choose which module to run. Generate data, train on data, or predict a sequence from a random starting state'
     )
@@ -37,7 +37,8 @@ def main():
         playback_recording()
     elif args.mode == 'auto_idiot':
         auto_idiot()
-        
+    elif args.mode == 'controller':
+        test_controller()
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
@@ -95,7 +96,7 @@ def predict(file=None):
     # recording.fps = .001
 
     player = SimulationPlayer(800, 800)
-    # time.sleep(10)
+    time.sleep(10)
     player.play(recording)
 
 
@@ -136,6 +137,12 @@ def auto_idiot():
         print(f"Run Number {i}")
         time.sleep(5)
         main_train(use_stored_model=True)
+
+def test_controller():
+    
+    utils.clear_old_data()
+    run_controller_sim()
+    
 
 
 if __name__ == "__main__":

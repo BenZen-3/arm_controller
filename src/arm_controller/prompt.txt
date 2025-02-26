@@ -1,0 +1,99 @@
+I am training a small language-conditioned diffusion model to predict the movement of a 2DoF arm based on text input. I need your help in generating high-quality example text inputs and corresponding arm end effector positions for training.
+
+Rules for Data Generation. Please carefully follow these constraints when generating data:
+
+1) The text prompt must describe the arm’s movement naturally and concisely, mimicking how a human might instruct the arm.
+2) The text prompt must be shorter than 256 word pieces for efficient processing by a language encoder.
+3) The text prompts must be diverse—including direct commands, geometric references, speed variations, and abstract motion descriptions.
+4) The arm’s movement speed is controllable in the range [1,5], where:
+	1 = Very slow
+	3 = Moderate
+	5 = Very fast
+	The speed should match the intent of the text prompt.
+5) The end effector coordinates are floats in the range:
+	X: [-32, 32]
+	Y: [-32, 32]
+	However, the arm's workspace is limited to a circular region of radius 30 due to its 2DoF constraints. Points outside this region are invalid and should be adjusted accordingly.
+6) The coordinate list should be structured to enable smooth interpolation between points. The density of points should be determined by spatial considerations, not timing.
+7) The starting coordinate should vary to ensure the dataset covers different arm positions.
+8) Each response should introduce a new, unique movement pattern. Avoid repeating previous examples. Consider different speeds, starting positions, and movement styles.
+9) The movement described by the points needs to be precise enough to draw the full shape with linear interpolations. Complex shapes, especially those with curves, should be point-dense.
+
+Output Format. You should generate responses strictly following this format, without any extra text or explanations:
+
+Format of a single response: 
+text_prompt: "<Natural language movement command>"
+speed: <integer between 1 and 5>
+coordinate_list: [(x1, y1), (x2, y2), (x3, y3), ...]
+
+A list of  approximately 15 responses should be output in json response. Several examples are provided in a JSON format below. Please follow this example, but be creative enough to generate a new, unique movement for a 2DoF robotic arm that hasn’t been used before. The arm should move in a natural way based on a human-like command. Ensure that the response differs in shape, trajectory, and speed from previous examples.
+
+[
+  {
+    "text_prompt": "Arm moves to the right fast",
+    "speed": 4,
+    "coordinate_list": [
+      [0, -10],
+      [5, -10],
+      [10, -10],
+      [15, -10]
+    ]
+  },
+  {
+    "text_prompt": "Move the arm in a circular motion with radius 16 units slowly",
+    "speed": 2,
+    "coordinate_list": [
+      [16.0, 0.0],
+      [13.8564, 8.0],
+      [8.0, 13.8564],
+      [0.0, 16.0],
+      [-8.0, 13.8564],
+      [-13.8564, 8.0],
+      [-16.0, 0.0],
+      [-13.8564, -8.0],
+      [-8.0, -13.8564],
+      [0.0, -16.0],
+      [8.0, -13.8564],
+      [13.8564, -8.0]
+    ]
+  },
+  {
+    "text_prompt": "Draw an V-shaped curve from left to right",
+    "speed": 3,
+    "coordinate_list": [
+      [-20, 10],
+      [-15, 5],
+      [-10, 0],
+      [-5, -5],
+      [0, -10],
+      [5, -5],
+      [10, 0],
+      [15, 5],
+      [20, 10]
+    ]
+  },
+  {
+    "text_prompt": "Move up, pause, then move left",
+    "speed": 2,
+    "coordinate_list": [
+      [0, -10],
+      [0, 0],
+      [0, 10],
+      [0, 10],
+      [-10, 10]
+    ]
+  },
+  {
+    "text_prompt": "Give me a centered square with side lengths of 10",
+    "speed": 3,
+    "coordinate_list": [
+      [10, 10],
+      [10, -10],
+      [-10, -10],
+      [-10, 10]
+    ]
+  }
+]
+
+
+Please generate responses following this format. Do not include any extra explanations. Thank you!

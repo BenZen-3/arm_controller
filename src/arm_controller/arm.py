@@ -52,20 +52,22 @@ physically grounded by a sim - a great benefit of an MPC - while having the exce
 
 """
 
-class Arm():
 
-    class ArmState:
-        """
-        contains all the stateful things that the arm has
-        """
+class ArmState:
+    """
+    contains all the stateful things that the arm has
+    """
 
-        def __init__(self, x0=0.0, y0=0.0, theta1=0.0, theta2=0.0, theta1_dot=0.0, theta2_dot=0.0):
-            self.x0 = x0
-            self.y0 = y0
-            self.theta1 = theta1
-            self.theta2 = theta2
-            self.theta1_dot = theta1_dot
-            self.theta2_dot = theta2_dot
+    def __init__(self, x0=0.0, y0=0.0, theta1=0.0, theta2=0.0, theta1_dot=0.0, theta2_dot=0.0):
+        self.x0 = x0
+        self.y0 = y0
+        self.theta1 = theta1
+        self.theta2 = theta2
+        self.theta1_dot = theta1_dot
+        self.theta2_dot = theta2_dot
+
+
+class Arm:
 
     def __init__(self, x0=0, y0=0, theta1=0, theta2=0, l1=1, l2=1, m1=1, m2=1, g=-9.8):
         
@@ -78,7 +80,7 @@ class Arm():
         self.linkage_width = .32
 
         # carry the state in a separate instance for clarity between params and state vars
-        self.state = self.ArmState(x0,y0, theta1, theta2)
+        self.state = ArmState(x0,y0, theta1, theta2)
 
     def dynamics(self):
         """
@@ -169,3 +171,59 @@ class Arm():
 
         return np.array([self.state.x0,self.state.y0]), np.array([x1,y1]), np.array([x2,y2])
     
+    def cartesian_EE_location(self):
+        """
+        same thing but the last one
+        """
+
+        return self.cartesian_joint_locations()[2]
+    
+    def inverse_kinematics(self, x, y):
+        """
+        gets the joint positions that correspond to the cartesian inputs
+        """
+        scalar_input = np.isscalar(x) and np.isscalar(y)
+        x, y = np.atleast_1d(x), np.atleast_1d(y)
+        d = np.sqrt(x**2 + y**2)
+        
+        b = np.arccos((self.l1**2 + self.l2**2 - x**2 - y**2) / (2 * self.l1 * self.l2))
+        a = np.arccos((self.l1**2 - self.l2**2 + x**2 + y**2) / (2 * self.l1 * d))
+        c = np.arctan2(y, x)
+        
+        theta1 = c - a
+        theta2 = np.pi - b
+        
+        theta1, theta2 = self.smooth_angles(theta1), self.smooth_angles(theta2)
+        
+        return (theta1.item(), theta2.item()) if scalar_input else (theta1, theta2)
+    
+    def jacobian(self):
+        """
+        jacobian
+        """
+    
+        # state
+        theta1 = self.state.theta1
+        theta2 = self.state.theta2
+
+        # arm params
+        l1 = self.l1
+        l2 = self.l2
+
+        jacobian = np.array([[-l1*np.sin(theta1) - l2*np.sin(theta1 + theta2), -l2*np.sin(theta1 + theta2)],
+                         [l1*np.cos(theta1) + l2*np.cos(theta1 + theta2), l2*np.cos(theta1 + theta2)]])
+        
+        return jacobian
+
+    def smooth_angles(self, angles): # TODO: THIS DOESNT BELONG HERE. THIS SCHEDULED FOR DEMOLITION
+        """
+        takes a list of angles and makes sure that the movements aren't insane
+        """
+        scalar_input = np.isscalar(angles)
+        angles = np.atleast_1d(angles)
+        diffs = np.diff(angles)
+        
+        adjustments = np.cumsum(np.where(diffs > np.pi, -2*np.pi, np.where(diffs < -np.pi, 2*np.pi, 0)))
+        
+        smoothed = angles[0] + np.concatenate(([0], adjustments))
+        return smoothed.item() if scalar_input else smoothed

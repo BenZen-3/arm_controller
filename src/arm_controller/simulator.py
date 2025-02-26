@@ -1,5 +1,7 @@
-from . import Arm
+from .arm import Arm
 from . import utils
+from .controller import ArmController, ArmPlanner
+from .player import SimulationPlayer
 import numpy as np
 from enum import Enum
 import math
@@ -128,22 +130,24 @@ class Recording:
 
 class Simulator:
 
-    def __init__(self, width, height, arm, voxel_size = .01, start = np.array([1,2]), goal = np.array([2,1])):
+    def __init__(self, width, height, voxel_size, arm, controller=None, planner=None):
 
         # these are in meters
         self.width = width
         self.height = height
+        self.voxel_size = voxel_size
 
         self.arm = arm
-        self.start = start
-        self.goal = goal
+        self.controller = controller
+        self.planner = planner
 
         # simulation init
         self.running = False
-        self.fps = 10
-        self.voxel_size = voxel_size # in meters
+        self.external_control = False
+        self.fps = 10 # TODO: make this higher... need higher accuracy than 10 hz
 
         self.check_conditions()
+        self.check_control()
         self.generate_voxels()
 
         # recording
@@ -159,6 +163,13 @@ class Simulator:
         assert (Decimal(str(self.width)) % Decimal(str(self.voxel_size)) == Decimal('0.0')), "Voxel Size does not work with width!"
         assert (Decimal(str(self.height)) % Decimal(str(self.voxel_size)) == Decimal('0.0')), "Voxel Size does not work with height!"
 
+    def check_control(self):
+        """
+        yeeeee
+        """
+        if self.controller and self.planner:
+            self.external_control = True
+
     def generate_voxels(self):
         """
         Generates a 2D grid of voxels based on the given width, height, and voxel size.
@@ -167,6 +178,23 @@ class Simulator:
         num_hor_vox = int(Decimal(str(self.width)) // Decimal(str(self.voxel_size)))
         num_vert_vox = int(Decimal(str(self.height)) // Decimal(str(self.voxel_size)))
         self.voxels = np.ones([num_hor_vox, num_vert_vox], dtype=Recording.frame_dtype) * VoxelState.NO_FILL.value
+
+    def control_arm(self, frame_time):
+        """
+        control the arm under
+        """
+
+        if self.external_control:
+
+            EE_loc = self.arm.cartesian_EE_location()
+            goal = self.planner.next_goal(EE_loc) # get the next goal
+            effort = self.controller.move_to(goal)
+            # print(effort)
+
+            self.arm.state_update(dt=frame_time, U=effort)
+        else:
+            self.arm.state_update(dt=frame_time)
+
 
     def run(self, sim_time=10):
         """
@@ -179,7 +207,8 @@ class Simulator:
 
         while self.running:
 
-            self.arm.state_update(frame_time)
+            self.control_arm(frame_time)
+
             self.fill_arm_voxels()
             self.recording.record_frame(self.voxels)
 
@@ -303,12 +332,11 @@ class BatchProcessor:
         Returns:
         - A tuple of (sim_id, recording).
         """
-        t1 = np.random.uniform(0, 2*np.pi)
-        t2 = np.random.uniform(0, 2*np.pi)
+        t1, t2 = np.random.uniform(0, 2*np.pi), np.random.uniform(0, 2*np.pi)
 
         # TODO: GET SOME RANDOMIZATIO IN THE ARM STATS
         arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=-9.8) 
-        sim = Simulator(width, height, arm, voxel_size)
+        sim = Simulator(width, height, voxel_size, arm)
         recording = sim.run(sim_time)
         if save_path is not None:
             recording.save(sim_id, save_path)
@@ -334,6 +362,40 @@ class BatchProcessor:
                 results[sim_id] = recording
 
         return results
+
+
+def run_controller_sim():
+
+    print("running controller")
+
+    width=4.2
+    height=4.2
+    voxel_size=0.065625
+    sim_time = 10
+    t1, t2 = 0, 0#np.random.uniform(0, 2*np.pi), np.random.uniform(0, 2*np.pi)
+
+    arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=-9.8) 
+    controller = ArmController(arm)
+    goals = np.array([[10,10], [10,-10], [-10,-10], [-10,-10]])
+    # goals = np.array([[10,10]])
+    speed = 3
+    planner = ArmPlanner(goals, speed)
+
+    print('starting sim')
+
+    sim = Simulator(width, height, voxel_size, arm, controller, planner)
+
+    player = SimulationPlayer(800, 800)
+    player.realtime_play(sim)
+
+    # sim_id = 0
+    # save_path = utils.get_data_folder()
+    # recording = sim.run(sim_time)
+    # recording.save(sim_id, save_path)
+
+    # sim.attach_controller(controller)
+
+
 
 
 if __name__ == "__main__":

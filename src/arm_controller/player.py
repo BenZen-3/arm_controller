@@ -1,6 +1,6 @@
+# from .simulator import Recording
 import pygame
 import time
-from .simulator import Recording, VoxelState
 import numpy as np
 import os
 
@@ -19,6 +19,60 @@ class SimulationPlayer:
         self.title = "Arm Simulator"
         self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption(self.title)
+
+    def realtime_play(self, sim): # TODO: This is a lot of dupe code
+        """
+        yeah it does that
+        """
+
+
+        self.voxel_size = sim.voxel_size
+        print(self.voxel_size)
+
+        fps = 30
+        frame_time = 1/fps
+        self.running = True
+
+        while self.running:
+            # frame_start = time.time()
+
+            # all the sim stuff for running
+            sim.control_arm(frame_time)
+            sim.fill_arm_voxels()
+            sim.recording.record_frame(sim.voxels)
+            frame = sim.recording.frame_sequence[-1]/255 # get the final frame
+
+            # TRASH
+
+            for row in frame:
+                row_output = ""
+                for voxel in row:
+                    if round(voxel) != 0:
+                        row_output += "-"
+                    else:
+                        row_output += " "
+
+                # print(row_output)
+
+
+
+            # print(np.max(frame))
+
+            self.check_quit()
+            self.draw_frame(frame)
+
+            # time_taken = time.time() - frame_start
+            # pause_time = frame_time - time_taken
+            # if pause_time > 0:
+            #     time.sleep(frame_time - time_taken)
+
+            time.sleep(frame_time)
+
+            if not self.running: # probably go back to a while(self.running) later
+                break
+
+        pygame.quit()
+
 
     def play(self, recording):
         """
