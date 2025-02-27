@@ -22,23 +22,32 @@ class ArmGoal:
 
 
 class ArmPlanner:
-    def __init__(self, cartesian_goals, speed):
+    def __init__(self, arm, cartesian_goals, speed):
+        self.arm = arm
         self.speed = speed
-        self.goals = self.convert_to_goals_dot(cartesian_goals)
+        self.goals = self.convert_to_theta_dot_goal(cartesian_goals)
 
         self.current_goal = self.goals[0] if self.goals else None
         self.proximity_threshold = 1
         self.speed_threshold = 1
 
-    def convert_to_goals_dot(self, cartesian_goals):
+    def convert_to_theta_dot_goal(self, cartesian_goals):
         """
         Converts Cartesian position goals to joint velocity goals.
         """
+
+        theta_goals = []
+        for goal in cartesian_goals:
+            t1_goal, t2_goal = self.arm.inverse_kinematics(goal[0], goal[1])
+            theta_goals.append((t1_goal, t2_goal))
+
+        # theta_goals = self.arm.inverse_kinematics(cartesian_goals[0], cartesian_goals[1])
+
         goals_dot = []
-        for i in range(len(cartesian_goals) - 1):
-            start = cartesian_goals[i]
-            end = cartesian_goals[i + 1]
-            speed = self.speed if i < len(cartesian_goals) - 2 else 0  # Slow down at the last goal
+        for i in range(len(theta_goals) - 1):
+            start = theta_goals[i]
+            end = theta_goals[i + 1]
+            speed = self.speed if i < len(theta_goals) - 2 else 0  # Slow down at the last goal
             goals_dot.append(ArmGoal(start, end, speed))
         return goals_dot
 
@@ -49,6 +58,9 @@ class ArmPlanner:
         """
         Computes the next goal in theta_dot space.
         """
+
+        return np.array([1,1])
+
         if len(self.goals) == 1:
             return self.current_goal
         
@@ -63,24 +75,49 @@ class ArmPlanner:
 
 
 class ArmController:
-    def __init__(self, arm, speed=3, Kp=1.0, Kd=0.1):
+    def __init__(self, arm, speed=3, Kp=15, Kd=3):
         self.arm = arm
         self.speed = speed
         self.Kp = Kp
         self.Kd = Kd
-        self.previous_error = np.zeros((2, 1))
+        self.previous_error = np.array([0,0])
 
-    def move_to(self, goal: ArmGoal):
+
+
+    def move_to(self, goal, dt):
         """
         Move to the given ArmGoal.
         """
 
-        # print(goal.direction)
-        # print(goal.speed)
+        current_location = self.arm.cartesian_EE_location()
+        error = goal - current_location
+        print(error)
 
-        theta_dot_goal = goal.direction * goal.speed
-        # print(theta_dot_goal)
-        return self.effort_to_move(theta_dot_goal)
+        J = self.arm.jacobian()
+        # J_inv = np.linalg.pinv(J)  # Use pseudo-inverse in case J is singular
+
+        error_derivative = (error - self.previous_error) / dt
+        task_space_force = self.Kp * error + self.Kd * error_derivative
+
+        torque = J.T @ task_space_force
+
+        self.previous_error = error
+
+        # self.arm.state.theta1_dot *= .9
+        # self.arm.state.theta2_dot *= .9
+
+        return torque
+
+        # self.arm.state.theta1 = goal.end[0]
+        # self.arm.state.theta2 = goal.end[1]
+        # self.arm.state.theta1_dot = 0
+        # self.arm.state.theta2_dot = 0
+
+
+        # return np.array([2,1])
+
+        # theta_dot_goal = goal.direction * goal.speed
+        # return self.effort_to_move(theta_dot_goal)
 
     def effort_to_move(self, goal_dot):
         """

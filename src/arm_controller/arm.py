@@ -77,10 +77,10 @@ class Arm:
         self.m1 = m1
         self.m2 = m2
         self.g = g
-        self.linkage_width = .32
+        self.linkage_width = .32 # TODO: UNUSED
 
         # carry the state in a separate instance for clarity between params and state vars
-        self.state = ArmState(x0,y0, theta1, theta2)
+        self.state = ArmState(x0, y0, theta1, theta2)
 
     def dynamics(self):
         """
@@ -194,6 +194,8 @@ class Arm:
         theta2 = np.pi - b
         
         theta1, theta2 = self.smooth_angles(theta1), self.smooth_angles(theta2)
+
+        print(f"CALLED IK, RESULTS ARE {theta1=}, {theta2=}")
         
         return (theta1.item(), theta2.item()) if scalar_input else (theta1, theta2)
     

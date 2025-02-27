@@ -25,16 +25,16 @@ class SimulationPlayer:
         yeah it does that
         """
 
-
-        self.voxel_size = sim.voxel_size
-        print(self.voxel_size)
+        # TODO: this is hardcoded
+        num_vox_width, num_vox_height =  64, 64
+        self.voxel_size = min(self.width // num_vox_width, self.height // num_vox_height)
 
         fps = 30
         frame_time = 1/fps
         self.running = True
 
         while self.running:
-            # frame_start = time.time()
+            frame_start = time.time()
 
             # all the sim stuff for running
             sim.control_arm(frame_time)
@@ -42,29 +42,13 @@ class SimulationPlayer:
             sim.recording.record_frame(sim.voxels)
             frame = sim.recording.frame_sequence[-1]/255 # get the final frame
 
-            # TRASH
-
-            for row in frame:
-                row_output = ""
-                for voxel in row:
-                    if round(voxel) != 0:
-                        row_output += "-"
-                    else:
-                        row_output += " "
-
-                # print(row_output)
-
-
-
-            # print(np.max(frame))
-
             self.check_quit()
             self.draw_frame(frame)
 
-            # time_taken = time.time() - frame_start
-            # pause_time = frame_time - time_taken
-            # if pause_time > 0:
-            #     time.sleep(frame_time - time_taken)
+            time_taken = time.time() - frame_start
+            pause_time = frame_time - time_taken
+            if pause_time > 0:
+                time.sleep(frame_time - time_taken)
 
             time.sleep(frame_time)
 

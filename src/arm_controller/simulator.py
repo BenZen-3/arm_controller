@@ -188,7 +188,8 @@ class Simulator:
 
             EE_loc = self.arm.cartesian_EE_location()
             goal = self.planner.next_goal(EE_loc) # get the next goal
-            effort = self.controller.move_to(goal)
+            # print(f"Moving to goal End: {goal.end}")
+            effort = self.controller.move_to(goal, frame_time)
             # print(effort)
 
             self.arm.state_update(dt=frame_time, U=effort)
@@ -208,7 +209,6 @@ class Simulator:
         while self.running:
 
             self.control_arm(frame_time)
-
             self.fill_arm_voxels()
             self.recording.record_frame(self.voxels)
 
@@ -371,15 +371,16 @@ def run_controller_sim():
     width=4.2
     height=4.2
     voxel_size=0.065625
-    sim_time = 10
     t1, t2 = 0, 0#np.random.uniform(0, 2*np.pi), np.random.uniform(0, 2*np.pi)
 
     arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=-9.8) 
     controller = ArmController(arm)
-    goals = np.array([[10,10], [10,-10], [-10,-10], [-10,-10]])
+    a = 1
+    b = -1
+    goals = np.array([[a, b], [a, b]]) # for some reason the Y is flipped? X is not flipped?
     # goals = np.array([[10,10]])
     speed = 3
-    planner = ArmPlanner(goals, speed)
+    planner = ArmPlanner(arm, goals, speed)
 
     print('starting sim')
 
