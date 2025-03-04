@@ -22,7 +22,7 @@ class SimulationPlayer:
 
         self.history = [] # TODO: this really doesnt belong here. get rid of this
 
-    def realtime_play(self, sim, trace=True): # TODO: This is a lot of dupe code
+    def realtime_play(self, sim, trace=False): # TODO: This is a lot of dupe code
         """
         yeah it does that
         """
@@ -46,7 +46,7 @@ class SimulationPlayer:
             frame = sim.recording.frame_sequence[-1]/255 # get the final frame
 
             self.check_quit()
-            self.draw_frame(frame)
+            #self.draw_frame(frame)
 
             if trace: 
                 ee_pos = sim.arm.cartesian_EE_location()
@@ -57,7 +57,8 @@ class SimulationPlayer:
             time_taken = time.time() - frame_start
             pause_time = frame_time - time_taken
             if pause_time > 0:
-                time.sleep(frame_time - time_taken)
+                pass
+                #time.sleep(frame_time - time_taken)
 
             time.sleep(frame_time)
 

@@ -104,6 +104,9 @@ def adjust_coordinates(data, delta_x=0, delta_y=0):
     max_rad = 2
     
     for item in data:
+
+        data_valid = True
+
         # Create a new item dictionary instead of using copy()
         adjusted_item = {
             "text_prompt": item["text_prompt"],
@@ -128,12 +131,15 @@ def adjust_coordinates(data, delta_x=0, delta_y=0):
             if original_y == 0:
                 original_y += .01
 
-            # if the LLM is stupid, we scale values. up to 20% scaled down.
+            # if the LLM is stupid, we scale values. up to 40% scaled down.
             depth = 0
-            while depth < 10:
+            max_depth = 10
+            while depth < max_depth:
                 if original_x**2 + original_y**2 > max_rad**2:
-                    original_x *= .98
-                    original_y *= .98
+                    original_x *= .95
+                    original_y *= .95
+                    if depth == max_depth: # HOLY CHRIST its still stupid. 
+                        data_valid = False
                 else:
                     break
                 
@@ -152,7 +158,8 @@ def adjust_coordinates(data, delta_x=0, delta_y=0):
                     
             adjusted_item["coordinate_list"].append(adjusted_coord)
         
-        adjusted_data.append(adjusted_item)
+        if data_valid:
+            adjusted_data.append(adjusted_item)
     
     # Return the result as a JSON string
     return json.dumps(adjusted_data, indent=2)

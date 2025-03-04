@@ -16,7 +16,7 @@ RULES FOR DATA GENERATION. Please carefully follow these constraints when genera
 7) The coordinate list should be structured to enable smooth interpolation between points. The density of points should be determined by spatial considerations the complexity of the shape.
 8) The first coordinate is the starting coordinate. It should vary to ensure the dataset covers different arm positions. The speed for this coordinate should be set to 3.
 9) Each response should introduce a new, unique movement pattern. Avoid repeating previous examples. Consider different speeds, starting positions, and movement styles.
-10) The movement described by the points needs to be precise enough to draw the full shape with linear interpolations. Complex shapes, especially those with curves, should be point-dense.
+10) The movement described by the points needs to be precise enough to draw the full shape with linear interpolations. Complex shapes, especially those with curves, should be point-dense. ALL CURVES SHOULD HAVE 10 POINTS MINIMUMUM!!!
 11) Each coordinate in the list must be paired with a speed value that determines how fast the arm moves to that point. This allows for varying speed within a single movement sequence.
 12) Whenever speed=0 is used, it must be preceded by a movement command that brings the arm to that exact coordinate. In other words, the arm must first move to the point before stopping there. An example is provided below:
   {"x": 1, "y": 1.1, "speed": 3},
@@ -128,7 +128,7 @@ Format of a single response:
 }
 
 
-OUTPUT. A list of approximately 5 responses should be output in a valid JSON response. Several examples are provided in a JSON format below. Please follow this example, but be creative enough to generate a new, unique movement for a 2DoF robotic arm that hasn’t been used before. The arm should move in a natural way based on a human-like command. Ensure that the response differs in shape, trajectory, and speed from previous examples.
+OUTPUT. A list of approximately 10 responses should be output in a valid JSON response. Several examples are provided in a JSON format below. Please follow this example, but be creative enough to generate a new, unique movement for a 2DoF robotic arm that hasn’t been used before. The arm should move in a natural way based on a human-like command. Ensure that the response differs in shape, trajectory, and speed from previous examples.
 
 [
   {

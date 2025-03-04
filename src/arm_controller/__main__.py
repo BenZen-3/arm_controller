@@ -6,7 +6,7 @@ import numpy as np
 
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
-from .simulator import BatchProcessor, Recording, run_controller_sim
+from .simulator import BatchProcessor, Recording, run_controller_sim, generate_sim_data
 from .language_generator import gather_llm_responses, load_all_llm_data
 from .learning import  main_train, main_predict
 from .player import SimulationPlayer
@@ -39,7 +39,8 @@ def main():
     elif args.mode == 'auto_idiot':
         auto_idiot()
     elif args.mode == 'controller':
-        llm_controller()
+        # llm_controller()
+        gen_sim_data()
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
@@ -104,7 +105,7 @@ def predict(file=None):
 
 
 # this is temp and this is trash code
-def playback_recording(rec_num=0):
+def playback_recording(rec_num=485):
     print("Playing recording")
 
     recs = []
@@ -113,13 +114,11 @@ def playback_recording(rec_num=0):
             rec = Recording()
             rec.init_from_file(sim_data_path)
             recs.append(rec)
+            
+            if rec.sim_prompt:
+                print(rec.sim_prompt)
 
     play_me = recs[rec_num]
-
-    print(type(play_me.frame_sequence[0]))
-    import numpy as np
-    print(np.max(play_me.frame_sequence[0]))
-
     player = SimulationPlayer(800, 800)
     player.play(play_me)
 
@@ -141,32 +140,17 @@ def auto_idiot():
 
 def llm_controller():
 
-    gather_llm_responses()
+    for i in range(10):
+        gather_llm_responses()
 
     data = load_all_llm_data()
     run_controller_sim(data)
 
-    # print(len(data))
-    # first_prompt = data[0]
-    # print(first_prompt)
+def gen_sim_data():
 
-    # print(first_prompt['text_prompt'])
-    # print(first_prompt['coordinate_list'][0]['x'])
-
-    # print("---"*100)
-    
-    # for d in data:
-        # print(type(d))
-
-    # gather_llm_responses()
-
-    # run_controller_sim()
-
-    # for i in range(10):
-        # gather_llm_responses()
-
-    
-    # run_controller_sim()
+    data = load_all_llm_data()
+    # run_controller_sim(data)
+    generate_sim_data(data)
 
 
 

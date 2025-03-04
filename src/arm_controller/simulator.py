@@ -22,7 +22,6 @@ class VoxelState(Enum):
 
 class Recording:
 
-    output_folder = "data"
     frame_dtype = np.uint8
 
     def __init__(self, prompt=None):
@@ -99,6 +98,7 @@ class Recording:
         save the file
         """
 
+        self.gather_meta_data()
         save_path = save_folder.joinpath(f"{id}_{self.name}")
         np.savez(save_path, self._frame_sequence, metadata=self.metadata)
 
@@ -190,16 +190,10 @@ class Simulator:
         """
 
         if self.external_control:
-
             self.controller.arm_update(dt=dt)
-
-            if self.controller.is_complete:
-                print("DONE")
-                self.running = False
-
+            self.running = not self.controller.is_complete
         else:
             self.arm.state_update(dt=dt)
-
 
     def run(self, sim_time=10):
         """
@@ -209,7 +203,7 @@ class Simulator:
         self.running = True
         frame_time = 1/self.fps
         total_time = 0
-
+        
         while self.running:
 
             self.control_arm(frame_time)
@@ -218,7 +212,7 @@ class Simulator:
 
             # timing, can put in while loop if nothing else breaks the total time?
             total_time += frame_time
-            if total_time >= sim_time: self.running = False
+            if total_time >= sim_time and not self.external_control: self.running = False
 
         return self.recording
 
@@ -367,12 +361,6 @@ class BatchProcessor:
 
         return results
 
-
-# def run_controller_sim_batch():
-
-
-
-
 def run_controller_sim(all_json_input):
 
     print("running controller")
@@ -384,8 +372,6 @@ def run_controller_sim(all_json_input):
 
     for json_trajectory in all_json_input:
 
-        print(json_trajectory)
-
         arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=9.8)
         arm_trajectory = ArmTrajectory(json_trajectory)
         controller = KinematicController(arm, arm_trajectory)
@@ -394,12 +380,58 @@ def run_controller_sim(all_json_input):
         player = SimulationPlayer(800, 800)
         player.realtime_play(sim)
 
-    # sim_id = 0
-    # save_path = utils.get_data_folder()
-    # recording = sim.run(sim_time)
-    # recording.save(sim_id, save_path)
 
-    # sim.attach_controller(controller)
+# def generate_sim_data(all_json_input):
+#     print("running controller")
+
+#     width=4.2
+#     height=4.2
+#     voxel_size=0.065625
+#     t1, t2 = -np.pi/2, np.pi/2
+#     save_path = "/data/sim_data"
+
+#     for sim_id, json_trajectory in enumerate(all_json_input):
+
+#         arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=9.8)
+#         arm_trajectory = ArmTrajectory(json_trajectory)
+#         controller = KinematicController(arm, arm_trajectory)
+#         sim = Simulator(width, height, voxel_size, arm, controller)
+
+#         recording = sim.run()
+#         if save_path is not None:
+#             recording.save(sim_id, save_path)
+        
+
+
+def run_single_simulation(sim_id, json_trajectory, save_path, width=4.2, height=4.2, voxel_size=0.065625):
+    t1, t2 = -np.pi/2, np.pi/2
+    
+    arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=9.8)
+    arm_trajectory = ArmTrajectory(json_trajectory)
+    controller = KinematicController(arm, arm_trajectory)
+    sim = Simulator(width, height, voxel_size, arm, controller)
+    
+    recording = sim.run()
+    if save_path is not None:
+        recording.sim_prompt = json_trajectory['text_prompt']
+        recording.save(sim_id, save_path)
+    
+    return sim_id, recording
+
+def generate_sim_data(all_json_input):
+    print("Running controller in parallel")
+    save_path = utils.get_data_folder()
+    
+    results = {}
+    with mp.Pool(processes=mp.cpu_count() - 1) as pool:
+        tasks = [(sim_id, json_trajectory, save_path) for sim_id, json_trajectory in enumerate(all_json_input)]
+        for sim_id, recording in pool.starmap(run_single_simulation, tasks):
+            results[sim_id] = recording
+    
+    return results
+
+
+
 
 
 
