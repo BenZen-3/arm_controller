@@ -1,99 +1,186 @@
-I am training a small language-conditioned diffusion model to predict the movement of a 2DoF arm based on text input. I need your help in generating high-quality example text inputs and corresponding arm end effector positions for training.
+INSTRUCTIONS. I am training a small language-conditioned diffusion model to predict the movement of a 2DoF arm based on text input. I need your help in generating high-quality example text inputs and corresponding arm end effector positions for training.
 
-Rules for Data Generation. Please carefully follow these constraints when generating data:
+RULES FOR DATA GENERATION. Please carefully follow these constraints when generating data:
 
 1) The text prompt must describe the arm’s movement naturally and concisely, mimicking how a human might instruct the arm.
 2) The text prompt must be shorter than 256 word pieces for efficient processing by a language encoder.
 3) The text prompts must be diverse—including direct commands, geometric references, speed variations, and abstract motion descriptions.
-4) The arm’s movement speed is controllable in the range [1,5], where:
+4) The arm’s movement speed is controllable in the range [0,5], where:
+  0 = Pause for 1 second
 	1 = Very slow
 	3 = Moderate
 	5 = Very fast
 	The speed should match the intent of the text prompt.
-5) The end effector coordinates are floats in the range:
-	X: [-32, 32]
-	Y: [-32, 32]
-	However, the arm's workspace is limited to a circular region of radius 30 due to its 2DoF constraints. Points outside this region are invalid and should be adjusted accordingly.
-6) The coordinate list should be structured to enable smooth interpolation between points. The density of points should be determined by spatial considerations, not timing.
-7) The starting coordinate should vary to ensure the dataset covers different arm positions.
-8) Each response should introduce a new, unique movement pattern. Avoid repeating previous examples. Consider different speeds, starting positions, and movement styles.
-9) The movement described by the points needs to be precise enough to draw the full shape with linear interpolations. Complex shapes, especially those with curves, should be point-dense.
+5) The arm's base is located at (0,0). DO NOT GO THROUGH THE BASE.
+6) The arm's workspace is limited to a circular region of radius 2 due to its 2DoF constraints. The end effector coordinates are floats constrained to a circular workspace of radius 2, meaning valid (x, y) positions must satisfy x^2+y^2<=4. Points outside this region are invalid and should be adjusted accordingly.
+7) The coordinate list should be structured to enable smooth interpolation between points. The density of points should be determined by spatial considerations the complexity of the shape.
+8) The first coordinate is the starting coordinate. It should vary to ensure the dataset covers different arm positions. The speed for this coordinate should be set to 3.
+9) Each response should introduce a new, unique movement pattern. Avoid repeating previous examples. Consider different speeds, starting positions, and movement styles.
+10) The movement described by the points needs to be precise enough to draw the full shape with linear interpolations. Complex shapes, especially those with curves, should be point-dense.
+11) Each coordinate in the list must be paired with a speed value that determines how fast the arm moves to that point. This allows for varying speed within a single movement sequence.
+12) Whenever speed=0 is used, it must be preceded by a movement command that brings the arm to that exact coordinate. In other words, the arm must first move to the point before stopping there. An example is provided below:
+  {"x": 1, "y": 1.1, "speed": 3},
+  {"x": 1, "y": 1.1, "speed": 0}
 
-Output Format. You should generate responses strictly following this format, without any extra text or explanations:
+
+COMMON PROBLEMS TO AVOID. These problems have occured in previous responses:
+
+PROBLEM 1) The end effector coordinates exceed the radius of 2. Please ensure the coordinates do not exceed this radius.
+
+This is an example of a poor response because the robot exceeds the workspace of a 2 unit radius.
+  {
+    "text_prompt": "Arm moves to the upper right corner slowly",
+    "coordinate_list": [
+      {"x": 0.1, "y": 0.1, "speed": 3},
+      {"x": 1.5, "y": 1.5, "speed": 1}
+    ]
+  }
+
+This is the corrected response. The robot does not exceed the workspace.
+  {
+    "text_prompt": "Arm moves to the upper right corner slowly",
+    "coordinate_list": [
+      {"x": 0.1, "y": 0.1, "speed": 3},
+      {"x": 1.4, "y": 1.4, "speed": 1}
+    ]
+  }
+
+PROBLEM 2) The text_prompt states that the robot should move to a location that it starts at. The first coordinate in the list is where the robot starts. If the second coordinate is the same as the first, the robot will be start and immediately complete its intended action. This problem should be carefully dealt with by selecting the first and second coordinates carefully.
+
+This is an example of a poor response because the robot is already at (2.0,0) so it does not move.
+  {
+    "text_prompt": "Arm moves to the right fast",
+    "coordinate_list": [
+      {"x": 2.0, "y": 0.0, "speed": 3},
+      {"x": 2.0, "y": 0.0, "speed": 5}
+    ]
+  }
+
+This is the corrected response. The robot starts at (0,0) and moves rapidly to (2.0,0).
+  {
+    "text_prompt": "Arm moves to the right fast",
+    "coordinate_list": [
+      {"x": 0.1, "y": 0.0, "speed": 3},
+      {"x": 2.0, "y": 0.0, "speed": 5}
+    ]
+  }
+
+PROBLEM 3) The coordinates travel through the base of the arm. This is physically impossible. Do not place coordinates at exactly (0,0). Adjust trajectories to avoid a linear interpolation that passes through (0,0).
+
+This is an example of a poor response because the robot traverses through (0,0) during the linear interpolation.
+  {
+    "text_prompt": "Arm moves diagonally from upper right hand side to lower left hand side",
+    "coordinate_list": [
+      {"x": 1, "y": 1, "speed": 3},
+      {"x": -1, "y": -1, "speed": 3}
+    ]
+  }
+
+This is the corrected response. The robot doesnot pass through (0,0) by using a small adjustment of the coordinates.
+  {
+    "text_prompt": "Arm moves diagonally from upper right hand side to lower left hand side",
+    "coordinate_list": [
+      {"x": 1.1, "y": 1, "speed": 3},
+      {"x": -.9, "y": -1, "speed": 3}
+    ]
+  }
+
+PROBLEM 4) The coordinate list does not have enough points to distinguish the shape of the object. Please make sure that there are enough coordinates that the shape is recognizable. For any curved segment, at least 3 points are needed. Circles should have at least 8 points.
+
+This is an example of a poor response because the robot's path is indistinguishable from a square.
+  {
+    "text_prompt": "An arm draws a small circle centered in the upper right hand side",
+    "coordinate_list": [
+      {"x": -0.2, "y": 1.2, "speed": 3},
+      {"x": 1.2, "y": 1.2, "speed": 3},
+      {"x": 1.2, "y": -0.2, "speed": 3},
+      {"x": -0.2, "y": -0.2, "speed": 3}
+    ]
+  }
+
+This is the corrected response. This path has enough points to show that it is a circle.
+  {
+    "text_prompt": "An arm draws a small circle centered in the upper right hand side",
+    "coordinate_list": [
+      {"x": -0.2, "y": 1.2, "speed": 3},
+      {"x": 0.5, "y": 1.5, "speed": 3},
+      {"x": 1.2, "y": 1.2, "speed": 3},
+      {"x": 1.5, "y": 0.5, "speed": 3},
+      {"x": 1.2, "y": -0.2, "speed": 3},
+      {"x": 0.5, "y": -0.5, "speed": 3},
+      {"x": -0.2, "y": -0.2, "speed": 3},
+       {"x": -0.5, "y": 0.5, "speed": 3}
+    ]
+  }
+
+
+OUTPUT FORMAT. You should generate responses strictly following this format, without any extra text or explanations:
 
 Format of a single response: 
-text_prompt: "<Natural language movement command>"
-speed: <integer between 1 and 5>
-coordinate_list: [(x1, y1), (x2, y2), (x3, y3), ...]
+{
+  "text_prompt": "<Natural language movement command>",
+  "coordinate_list": [
+    {"x": x1, "y": y1, "speed": s1},
+    {"x": x2, "y": y2, "speed": s2},
+    {"x": x3, "y": y3, "speed": s3},
+    ...
+  ]
+}
 
-A list of  approximately 15 responses should be output in json response. Several examples are provided in a JSON format below. Please follow this example, but be creative enough to generate a new, unique movement for a 2DoF robotic arm that hasn’t been used before. The arm should move in a natural way based on a human-like command. Ensure that the response differs in shape, trajectory, and speed from previous examples.
+
+OUTPUT. A list of approximately 5 responses should be output in a valid JSON response. Several examples are provided in a JSON format below. Please follow this example, but be creative enough to generate a new, unique movement for a 2DoF robotic arm that hasn’t been used before. The arm should move in a natural way based on a human-like command. Ensure that the response differs in shape, trajectory, and speed from previous examples.
 
 [
   {
-    "text_prompt": "Arm moves to the right fast",
-    "speed": 4,
+    "text_prompt": "Arm moves to the right fast, then slows down",
     "coordinate_list": [
-      [0, -10],
-      [5, -10],
-      [10, -10],
-      [15, -10]
+      {"x": 0.5, "y": 0.0, "speed": 3},
+      {"x": 1.5, "y": 0.0, "speed": 5},
+      {"x": 1.8, "y": 0.0, "speed": 3},
+      {"x": 2.0, "y": 0.0, "speed": 1}
     ]
   },
   {
-    "text_prompt": "Move the arm in a circular motion with radius 16 units slowly",
-    "speed": 2,
+    "text_prompt": "Move the arm in a circular motion with radius 1.5 units, varying speed",
     "coordinate_list": [
-      [16.0, 0.0],
-      [13.8564, 8.0],
-      [8.0, 13.8564],
-      [0.0, 16.0],
-      [-8.0, 13.8564],
-      [-13.8564, 8.0],
-      [-16.0, 0.0],
-      [-13.8564, -8.0],
-      [-8.0, -13.8564],
-      [0.0, -16.0],
-      [8.0, -13.8564],
-      [13.8564, -8.0]
+      {"x": 1.5, "y": 0.0, "speed": 3},
+      {"x": 1.06, "y": 1.06, "speed": 4},
+      {"x": 0.0, "y": 1.5, "speed": 2},
+      {"x": -1.06, "y": 1.06, "speed": 5},
+      {"x": -1.5, "y": 0.0, "speed": 3},
+      {"x": -1.06, "y": -1.06, "speed": 4},
+      {"x": 0.0, "y": -1.5, "speed": 2},
+      {"x": 1.06, "y": -1.06, "speed": 5},
+      {"x": 1.5, "y": 0.0, "speed": 3}
     ]
   },
   {
-    "text_prompt": "Draw an V-shaped curve from left to right",
-    "speed": 3,
+    "text_prompt": "Draw a V-shaped curve from left to right, starting slow and accelerating",
     "coordinate_list": [
-      [-20, 10],
-      [-15, 5],
-      [-10, 0],
-      [-5, -5],
-      [0, -10],
-      [5, -5],
-      [10, 0],
-      [15, 5],
-      [20, 10]
+      {"x": -1.5, "y": 1.5, "speed": 1},
+      {"x": 0.0, "y": -1.5, "speed": 3},
+      {"x": 1.5, "y": 1.5, "speed": 5}
     ]
   },
   {
     "text_prompt": "Move up, pause, then move left",
-    "speed": 2,
     "coordinate_list": [
-      [0, -10],
-      [0, 0],
-      [0, 10],
-      [0, 10],
-      [-10, 10]
+      {"x": 0.0, "y": 1.0, "speed": 3},
+      {"x": 0.0, "y": 1.5, "speed": 3},
+      {"x": 0.0, "y": 1.5, "speed": 0},
+      {"x": -1.0, "y": 1.5, "speed": 3}
     ]
   },
   {
-    "text_prompt": "Give me a centered square with side lengths of 10",
-    "speed": 3,
+    "text_prompt": "Give me a centered square with side lengths of 1, moving at a steady pace",
     "coordinate_list": [
-      [10, 10],
-      [10, -10],
-      [-10, -10],
-      [-10, 10]
+      {"x": -0.5, "y": 0.5, "speed": 3},
+      {"x": 0.5, "y": 0.5, "speed": 3},
+      {"x": 0.5, "y": -0.5, "speed": 3},
+      {"x": -0.5, "y": -0.5, "speed": 3},
+      {"x": -0.5, "y": 0.5, "speed": 3}
     ]
   }
 ]
 
-
-Please generate responses following this format. Do not include any extra explanations. Thank you!
+DO NOT INCLUDE EXTRA INFORMATION. Please generate responses following this format. Do not include any extra explanations. Thank you!

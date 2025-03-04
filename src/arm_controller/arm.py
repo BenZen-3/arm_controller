@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 
 """
 musings
@@ -69,7 +70,7 @@ class ArmState:
 
 class Arm:
 
-    def __init__(self, x0=0, y0=0, theta1=0, theta2=0, l1=1, l2=1, m1=1, m2=1, g=-9.8):
+    def __init__(self, x0=0, y0=0, theta1=0, theta2=0, l1=1, l2=1, m1=1, m2=1, g=9.8):
         
         # params, not modified 
         self.l1 = l1
@@ -78,6 +79,8 @@ class Arm:
         self.m2 = m2
         self.g = g
         self.linkage_width = .32 # TODO: UNUSED
+
+        self.history = []
 
         # carry the state in a separate instance for clarity between params and state vars
         self.state = ArmState(x0, y0, theta1, theta2)
@@ -141,7 +144,7 @@ class Arm:
 
         return np.array([theta1_dot, theta2_dot, q_dd[0], q_dd[1]])
 
-    def state_update(self, dt, U=np.array([[0], [0]])): # not even sure if that shape is correct? 
+    def state_update(self, dt, U=np.array([[0], [0]])): # not even sure if U shape is correct? 
         """
         Update the state given some dt and control vecotr U
         """
@@ -178,27 +181,113 @@ class Arm:
 
         return self.cartesian_joint_locations()[2]
     
+    # def kinematic_move(self, x, y, smooth = True):
+    #     """
+    #     purely kinematic move to x, y
+    #     """
+
+    #     t1_new, t2_new = self.inverse_kinematics(x, y)
+
+    #     if smooth: # TODO: This is like really probably a terrible horrible absolutely not good idea
+    #         state_copy = copy.deepcopy(self.state)
+    #         self.history.append(state_copy)
+
+    #         t1_history = []
+    #         t2_history = []
+
+    #         # get an array of the old thetas. tack the newest one on. smooth them. get the last one again...
+    #         for state in self.history: 
+    #             t1_old = state.theta1
+    #             t2_old = state.theta2
+
+    #             t1_history.append(t1_old)
+    #             t2_history.append(t2_old)
+
+    #         t1_history.append(t1_new)
+    #         t2_history.append(t2_new)
+
+    #         t1_smooth = self.smooth_angles(t1_history)[-1]
+    #         t2_smooth = self.smooth_angles(t2_history)[-1]
+
+    #         print(t1_smooth)
+
+    #         self.state.theta1 = t1_smooth
+    #         self.state.theta2 = t2_smooth
+
+    #     else:
+
+    #         self.state.theta1 = t1_new
+    #         self.state.theta2 = t2_new
+
+    def kinematic_move(self, x, y, smooth=True):
+        """
+        Purely kinematic move to x, y, maintaining solution consistency
+        when smooth mode is enabled.
+        """
+        # Get the new joint angles from inverse kinematics
+        t1_new, t2_new = self.inverse_kinematics(x, y)
+        
+        if smooth and len(self.history) > 0:
+
+            # Save current state
+            state_copy = copy.deepcopy(self.state)
+            self.history.append(state_copy)
+            
+            # Extract angle histories
+            t1_history = [state.theta1 for state in self.history]
+            t2_history = [state.theta2 for state in self.history]
+            
+            # Add the newly calculated angles to the histories
+            t1_history.append(t1_new)
+            t2_history.append(t2_new)
+            
+            # Smooth both angle sequences to maintain solution consistency
+            t1_smoothed = self.smooth_angles_AHH(t1_history)
+            t2_smoothed = self.smooth_angles_AHH(t2_history)
+            
+            # Use the latest smoothed angles
+            self.state.theta1 = t1_smoothed[-1]
+            self.state.theta2 = t2_smoothed[-1]
+        else:
+            # If not smoothing or no history, just use the direct IK solution
+            if smooth:  # First entry for history if smooth mode is on
+                state_copy = copy.deepcopy(self.state)
+                self.history.append(state_copy)
+                
+            self.state.theta1 = t1_new
+            self.state.theta2 = t2_new
+        
+        # Limit history size to prevent memory issues
+        max_history = 100  # Adjust as needed
+        if len(self.history) > max_history:
+            self.history = self.history[-max_history:]  
+    
     def inverse_kinematics(self, x, y):
         """
-        gets the joint positions that correspond to the cartesian inputs
+        Gets the joint positions that correspond to the Cartesian inputs,
+        accounting for the base position (x0, y0).
         """
+
         scalar_input = np.isscalar(x) and np.isscalar(y)
         x, y = np.atleast_1d(x), np.atleast_1d(y)
-        d = np.sqrt(x**2 + y**2)
         
-        b = np.arccos((self.l1**2 + self.l2**2 - x**2 - y**2) / (2 * self.l1 * self.l2))
-        a = np.arccos((self.l1**2 - self.l2**2 + x**2 + y**2) / (2 * self.l1 * d))
-        c = np.arctan2(y, x)
+        # Adjust for base position
+        x_rel = x - self.state.x0
+        y_rel = y - self.state.y0
+
+        d = np.sqrt(x_rel**2 + y_rel**2)
+        
+        b = np.arccos((self.l1**2 + self.l2**2 - x_rel**2 - y_rel**2) / (2 * self.l1 * self.l2))
+        a = np.arccos((self.l1**2 - self.l2**2 + x_rel**2 + y_rel**2) / (2 * self.l1 * d))
+        c = np.arctan2(y_rel, x_rel)
         
         theta1 = c - a
         theta2 = np.pi - b
         
         theta1, theta2 = self.smooth_angles(theta1), self.smooth_angles(theta2)
-
-        print(f"CALLED IK, RESULTS ARE {theta1=}, {theta2=}")
         
         return (theta1.item(), theta2.item()) if scalar_input else (theta1, theta2)
-    
+
     def jacobian(self):
         """
         jacobian
@@ -228,4 +317,40 @@ class Arm:
         adjustments = np.cumsum(np.where(diffs > np.pi, -2*np.pi, np.where(diffs < -np.pi, 2*np.pi, 0)))
         
         smoothed = angles[0] + np.concatenate(([0], adjustments))
+        return smoothed.item() if scalar_input else smoothed
+        
+
+    def smooth_angles_AHH(self, angles):
+        """
+        Takes a list of angles and ensures continuity by detecting and correcting large jumps
+        that would indicate a flip between IK solutions.
+        
+        Args:
+            angles: Array or list of angles (radians)
+            
+        Returns:
+            Smoothed angles with consistency in solution choice
+        """
+        # Convert to numpy array if not already
+        angles = np.atleast_1d(angles)
+        scalar_input = np.isscalar(angles) or (isinstance(angles, np.ndarray) and angles.size == 1)
+        
+        if len(angles) <= 1:
+            return angles
+        
+        # Create a copy to modify
+        smoothed = np.copy(angles)
+        
+        # Detect large jumps (greater than π radians) and correct them
+        # These typically indicate a flip between the two IK solutions
+        for i in range(1, len(smoothed)):
+            diff = smoothed[i] - smoothed[i-1]
+            
+            # If the jump is more than π radians, it's likely a solution flip
+            # We adjust by 2π to bring it back to the same solution space
+            if diff > np.pi:
+                smoothed[i] -= 2 * np.pi
+            elif diff < -np.pi:
+                smoothed[i] += 2 * np.pi
+        
         return smoothed.item() if scalar_input else smoothed

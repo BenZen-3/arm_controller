@@ -20,7 +20,9 @@ class SimulationPlayer:
         self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption(self.title)
 
-    def realtime_play(self, sim): # TODO: This is a lot of dupe code
+        self.history = [] # TODO: this really doesnt belong here. get rid of this
+
+    def realtime_play(self, sim, trace=True): # TODO: This is a lot of dupe code
         """
         yeah it does that
         """
@@ -32,6 +34,7 @@ class SimulationPlayer:
         fps = 30
         frame_time = 1/fps
         self.running = True
+        sim.running = True
 
         while self.running:
             frame_start = time.time()
@@ -45,6 +48,12 @@ class SimulationPlayer:
             self.check_quit()
             self.draw_frame(frame)
 
+            if trace: 
+                ee_pos = sim.arm.cartesian_EE_location()
+                self.history.append(ee_pos)
+                for point in self.history:
+                    self.trace_arm_position(point)
+
             time_taken = time.time() - frame_start
             pause_time = frame_time - time_taken
             if pause_time > 0:
@@ -52,11 +61,19 @@ class SimulationPlayer:
 
             time.sleep(frame_time)
 
-            if not self.running: # probably go back to a while(self.running) later
+            if not self.running or not sim.running:
                 break
 
         pygame.quit()
 
+    def trace_arm_position(self, ee_pos):
+        """
+        yeah
+        """
+
+        ee_zeroed = np.array([ee_pos[0] - 2.1, ee_pos[1] - 2.1])
+        pix_location =  ee_zeroed * 64 * 12 / 4.2 # num voxels, voxel size, size of screen in meters
+        pygame.draw.circle(self.screen, RED, (pix_location[0] + self.width /2, self.height/2 - pix_location[1]), 10)
 
     def play(self, recording):
         """
@@ -96,6 +113,9 @@ class SimulationPlayer:
         self.voxel_size = min(self.width // num_vox_width, self.height // num_vox_height)
 
     def draw_frame(self, frame):
+
+        # flip the frame so that it can be drawn from the lop left
+        frame = np.flipud(frame)
 
         for vox_id_vert, voxel_row in enumerate(frame):
             for vox_id_hor, voxel in enumerate(voxel_row):

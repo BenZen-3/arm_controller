@@ -1,12 +1,13 @@
 from .arm import Arm
 from . import utils
-from .controller import ArmController, ArmPlanner
+from .controller import KinematicController, ArmTrajectory
 from .player import SimulationPlayer
 import numpy as np
 from enum import Enum
 import math
 from decimal import Decimal
 import multiprocessing as mp
+import json
 
 # TODO: Make the simulation freq different than the recording FPS
 
@@ -24,16 +25,19 @@ class Recording:
     output_folder = "data"
     frame_dtype = np.uint8
 
-    def __init__(self):
+    def __init__(self, prompt=None):
         """
         init a recording
         """
+
+        self.sim_prompt = prompt
         
         # self._frame_sequence = np.empty() # TODO: switch to a numpy array
         self._frame_sequence = []
         self.metadata = {'date': '', 'frame_width': '', 'frame_height': '', 
                          'voxel_size': '', 'fps': '', 'arm_L1': '', 
-                         'arm_L2': '', 'arm_M1': '', 'arm_M2': ''}
+                         'arm_L2': '', 'arm_M1': '', 'arm_M2': '',
+                         'sim_prompt': ''}
 
     def init_from_file(self, path):
         """
@@ -53,6 +57,7 @@ class Recording:
         self.frame_height = self.metadata['frame_height']
         self.voxel_size = self.metadata['voxel_size']
         self.fps = self.metadata['fps']
+        self.sim_prompt = self.metadata['sim_prompt']
 
     def init_for_recording(self, frame_width, frame_height, voxel_size, fps, arm, name=None):
 
@@ -81,6 +86,7 @@ class Recording:
         self.metadata['arm_L2'] = self.arm.l2
         self.metadata['arm_M1'] = self.arm.m1
         self.metadata['arm_M2'] = self.arm.m2
+        self.metadata['sim_prompt'] = self.sim_prompt
 
     def record_frame(self, voxel_grid):
         """
@@ -112,12 +118,12 @@ class Recording:
         return self.frame_sequence.astype(np.float32) / normalize_factor
 
     @classmethod
-    def frame_printer(self, frame):
+    def frame_printer(cls, frame):
         """
         pretty printer for a frame
         """
 
-        for row in frame:
+        for row in np.flipud(frame):
             row_output = ""
             for voxel in row:
                 if round(voxel) != VoxelState.NO_FILL.value:
@@ -130,7 +136,7 @@ class Recording:
 
 class Simulator:
 
-    def __init__(self, width, height, voxel_size, arm, controller=None, planner=None):
+    def __init__(self, width, height, voxel_size, arm, controller=None):
 
         # these are in meters
         self.width = width
@@ -139,7 +145,6 @@ class Simulator:
 
         self.arm = arm
         self.controller = controller
-        self.planner = planner
 
         # simulation init
         self.running = False
@@ -167,7 +172,7 @@ class Simulator:
         """
         yeeeee
         """
-        if self.controller and self.planner:
+        if self.controller:
             self.external_control = True
 
     def generate_voxels(self):
@@ -179,22 +184,21 @@ class Simulator:
         num_vert_vox = int(Decimal(str(self.height)) // Decimal(str(self.voxel_size)))
         self.voxels = np.ones([num_hor_vox, num_vert_vox], dtype=Recording.frame_dtype) * VoxelState.NO_FILL.value
 
-    def control_arm(self, frame_time):
+    def control_arm(self, dt):
         """
-        control the arm under
+        control the arm
         """
 
         if self.external_control:
 
-            EE_loc = self.arm.cartesian_EE_location()
-            goal = self.planner.next_goal(EE_loc) # get the next goal
-            # print(f"Moving to goal End: {goal.end}")
-            effort = self.controller.move_to(goal, frame_time)
-            # print(effort)
+            self.controller.arm_update(dt=dt)
 
-            self.arm.state_update(dt=frame_time, U=effort)
+            if self.controller.is_complete:
+                print("DONE")
+                self.running = False
+
         else:
-            self.arm.state_update(dt=frame_time)
+            self.arm.state_update(dt=dt)
 
 
     def run(self, sim_time=10):
@@ -335,14 +339,14 @@ class BatchProcessor:
         t1, t2 = np.random.uniform(0, 2*np.pi), np.random.uniform(0, 2*np.pi)
 
         # TODO: GET SOME RANDOMIZATIO IN THE ARM STATS
-        arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=-9.8) 
+        arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=9.8) 
         sim = Simulator(width, height, voxel_size, arm)
         recording = sim.run(sim_time)
         if save_path is not None:
             recording.save(sim_id, save_path)
         return sim_id, recording
 
-    def batch_process(self):
+    def batch_process(self, prompts=None):
         """
         Run all simulations in parallel and collect the results.
         
@@ -351,10 +355,10 @@ class BatchProcessor:
         """
         results = {}
         # use all but one cpu because I enjoy ussing my computer
-        with mp.Pool(processes=mp.cpu_count()-1) as pool:
+        with mp.Pool(processes=mp.cpu_count() - 1) as pool:
             # Prepare simulation arguments
             tasks = [
-                (sim_id, self.sim_time, 4.2, 4.2, 0.065625, self.save_path)  # TODO: FIX THIS HARDCODED SHIT
+                (sim_id, self.sim_time, 4.2, 4.2, 0.065625, self.save_path) 
                 for sim_id in range(self.num_sims)
             ]
             # Run simulations in parallel
@@ -364,30 +368,31 @@ class BatchProcessor:
         return results
 
 
-def run_controller_sim():
+# def run_controller_sim_batch():
+
+
+
+
+def run_controller_sim(all_json_input):
 
     print("running controller")
 
     width=4.2
     height=4.2
     voxel_size=0.065625
-    t1, t2 = 0, 0#np.random.uniform(0, 2*np.pi), np.random.uniform(0, 2*np.pi)
+    t1, t2 = -np.pi/2, np.pi/2#np.random.uniform(0, 2*np.pi), np.random.uniform(0, 2*np.pi)
 
-    arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=-9.8) 
-    controller = ArmController(arm)
-    a = 1
-    b = -1
-    goals = np.array([[a, b], [a, b]]) # for some reason the Y is flipped? X is not flipped?
-    # goals = np.array([[10,10]])
-    speed = 3
-    planner = ArmPlanner(arm, goals, speed)
+    for json_trajectory in all_json_input:
 
-    print('starting sim')
+        print(json_trajectory)
 
-    sim = Simulator(width, height, voxel_size, arm, controller, planner)
+        arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=9.8)
+        arm_trajectory = ArmTrajectory(json_trajectory)
+        controller = KinematicController(arm, arm_trajectory)
 
-    player = SimulationPlayer(800, 800)
-    player.realtime_play(sim)
+        sim = Simulator(width, height, voxel_size, arm, controller)
+        player = SimulationPlayer(800, 800)
+        player.realtime_play(sim)
 
     # sim_id = 0
     # save_path = utils.get_data_folder()

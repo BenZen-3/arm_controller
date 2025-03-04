@@ -7,6 +7,7 @@ import numpy as np
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 from .simulator import BatchProcessor, Recording, run_controller_sim
+from .language_generator import gather_llm_responses, load_all_llm_data
 from .learning import  main_train, main_predict
 from .player import SimulationPlayer
 from . import utils
@@ -38,7 +39,7 @@ def main():
     elif args.mode == 'auto_idiot':
         auto_idiot()
     elif args.mode == 'controller':
-        test_controller()
+        llm_controller()
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
@@ -138,11 +139,36 @@ def auto_idiot():
         time.sleep(5)
         main_train(use_stored_model=True)
 
-def test_controller():
+def llm_controller():
+
+    gather_llm_responses()
+
+    data = load_all_llm_data()
+    run_controller_sim(data)
+
+    # print(len(data))
+    # first_prompt = data[0]
+    # print(first_prompt)
+
+    # print(first_prompt['text_prompt'])
+    # print(first_prompt['coordinate_list'][0]['x'])
+
+    # print("---"*100)
     
-    utils.clear_old_data()
-    run_controller_sim()
+    # for d in data:
+        # print(type(d))
+
+    # gather_llm_responses()
+
+    # run_controller_sim()
+
+    # for i in range(10):
+        # gather_llm_responses()
+
     
+    # run_controller_sim()
+
+
 
 
 if __name__ == "__main__":
@@ -190,6 +216,13 @@ What others have done in the past for similar problems:
 
 What I want to do in the future:
     diffusion transformer!
+
+    
+
+I can generate json for an arm's path
+I can run json for a single path
+
+I need to be able to batch process these and make a bunch ton of paths from a bunch of prompts
 
 
 
