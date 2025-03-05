@@ -149,7 +149,6 @@ def llm_controller():
 def gen_sim_data():
 
     data = load_all_llm_data()
-    # run_controller_sim(data)
     generate_sim_data(data)
 
 
@@ -208,6 +207,7 @@ I can run json for a single path
 
 I need to be able to batch process these and make a bunch ton of paths from a bunch of prompts
 
+Dont give it state at train - give it state only during use!
 
-
+Can the diffusion process be guided by what the robot should look like? That way it actually outputs the correct robot...
 """

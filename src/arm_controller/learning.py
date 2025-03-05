@@ -297,8 +297,8 @@ def main_train(use_stored_model=None):
     Builds the model, prepares the dataset, and trains the model.
     """
 
-    _num_input_frames = 16
-    _num_label_frames = 4
+    _num_input_frames = 20
+    _num_label_frames = 1
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = VideoDataset(device, num_input_frames=_num_input_frames, num_label_frames=_num_label_frames)
@@ -330,8 +330,8 @@ def main_predict(seed_frames, num_future_frames=10):
     Loads a trained model and generates future frames given a seed frame.
     """
 
-    _num_input_frames = 16
-    _num_label_frames = 4
+    _num_input_frames = 20
+    _num_label_frames = 1
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_path = utils.get_most_recent_model()
