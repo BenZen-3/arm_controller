@@ -149,7 +149,7 @@ class Simulator:
         # simulation init
         self.running = False
         self.external_control = False
-        self.fps = 10 # TODO: make this higher... need higher accuracy than 10 hz
+        self.fps = 30 # TODO: make this higher... need higher accuracy than 10 hz
 
         self.check_conditions()
         self.check_control()

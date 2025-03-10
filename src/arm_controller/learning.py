@@ -26,7 +26,7 @@ class VideoDataset(Dataset):
         self.num_label_frames = num_label_frames
         self.data = None
         self.labels = None
-        self.max_recordings = 500
+        self.max_recordings = 5
 
         if not recordings:
             self.load_recordings()
@@ -204,7 +204,9 @@ class FramePredictionModel(nn.Module):
         Trains the model using the given dataset and optimizer.
         """
 
-        scaler = torch.amp.GradScaler("cuda")
+        # scaler = torch.amp.GradScaler("cuda")
+        scaler = torch.cuda.amp.GradScaler(enabled=True)
+
 
         for epoch in range(num_epochs):
             self.train()
@@ -297,7 +299,7 @@ def main_train(use_stored_model=None):
     Builds the model, prepares the dataset, and trains the model.
     """
 
-    _num_input_frames = 20
+    _num_input_frames = 16
     _num_label_frames = 1
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -330,7 +332,7 @@ def main_predict(seed_frames, num_future_frames=10):
     Loads a trained model and generates future frames given a seed frame.
     """
 
-    _num_input_frames = 20
+    _num_input_frames = 16
     _num_label_frames = 1
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

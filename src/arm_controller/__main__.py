@@ -148,6 +148,7 @@ def llm_controller():
 
 def gen_sim_data():
 
+    utils.clear_old_data()
     data = load_all_llm_data()
     generate_sim_data(data)
 
@@ -210,4 +211,32 @@ I need to be able to batch process these and make a bunch ton of paths from a bu
 Dont give it state at train - give it state only during use!
 
 Can the diffusion process be guided by what the robot should look like? That way it actually outputs the correct robot...
+
+
+Current status:
+    so the LLM is actually sooo bad at making the robot do things that make sense.
+    I need to give it my own shapes with parameterized functions OR G-code possibly
+
+New Idea:
+    3D gaussian diffusion.
+    even 4D gaussian diffusion?
+
+Can I structure diffusion to layer on different shapes?
+    What if it starts with big shapes and then they get smaller?
+    Generates the big structure first and the details later!
+
+End Goal:
+    Diffusion model for 3D or 4D Gaussians
+    Hierarchical diffusion
+        start with big gaussians
+        move to smaller gaussians
+    selective gaussian placement - where do they start?
+    guided diffusion - how well does my diffusion line up with my robot? Also, you can guide it with physics!
+
+    
+Questions:
+    What is a latent diffusion model and how is it any different?
+    Should I use a variational autoencoder?
+    
+
 """

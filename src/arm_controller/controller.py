@@ -191,79 +191,6 @@ class KinematicController:
         return prev_pos + progress * (curr_pos - prev_pos)
     
 
-
-
-    
-# class ArmGoal:
-#     def __init__(self, start, end, speed):
-#         """
-#         An ArmGoal is a vector defining motion from start to end at a given speed.
-#         """
-#         self.start = np.array(start)
-#         self.end = np.array(end)
-#         self.speed = speed
-        
-#         direction = self.end - self.start
-#         self._direction = direction / np.linalg.norm(direction) if np.linalg.norm(direction) != 0 else np.zeros_like(direction)
-    
-#     @property
-#     def direction(self):
-#         return self._direction
-
-
-# class ArmPlanner:
-#     def __init__(self, arm, cartesian_goals, speed):
-#         self.arm = arm
-#         self.speed = speed
-#         self.goals = self.convert_to_theta_dot_goal(cartesian_goals)
-
-#         self.current_goal = self.goals[0] if self.goals else None
-#         self.proximity_threshold = 1
-#         self.speed_threshold = 1
-
-#     def convert_to_theta_dot_goal(self, cartesian_goals):
-#         """
-#         Converts Cartesian position goals to joint velocity goals.
-#         """
-
-#         theta_goals = []
-#         for goal in cartesian_goals:
-#             t1_goal, t2_goal = self.arm.inverse_kinematics(goal[0], goal[1])
-#             theta_goals.append((t1_goal, t2_goal))
-
-#         # theta_goals = self.arm.inverse_kinematics(cartesian_goals[0], cartesian_goals[1])
-
-#         goals_dot = []
-#         for i in range(len(theta_goals) - 1):
-#             start = theta_goals[i]
-#             end = theta_goals[i + 1]
-#             speed = self.speed if i < len(theta_goals) - 2 else 0  # Slow down at the last goal
-#             goals_dot.append(ArmGoal(start, end, speed))
-#         return goals_dot
-
-#     def goal_proximity(self, goal, arm_pos):
-#         return np.linalg.norm(np.array(goal.end) - np.array(arm_pos))
-
-#     def next_goal(self, arm_pos, arm_speed=0):
-#         """
-#         Computes the next goal in theta_dot space.
-#         """
-
-#         return np.array([1,1]) + np.array([2.1, 2.1])
-
-#         if len(self.goals) == 1:
-#             return self.current_goal
-        
-#         if self.goal_proximity(self.current_goal, arm_pos) < self.proximity_threshold: #and np.linalg.norm(arm_speed) < self.speed + self.speed_threshold:
-#             self.goals.pop(0)
-#             if self.goals:
-#                 self.current_goal = self.goals[0]
-#             else:
-#                 self.current_goal = None
-        
-#         return self.current_goal
-
-
 class DynamicArmController:
     """
     cartesian PD or joint space PD computed torque controller
@@ -321,3 +248,45 @@ class DynamicArmController:
 
         return C.flatten() + G.flatten() + control_T
 
+# class Line:
+
+#     def __init__(self):
+#         pass
+
+# class Shape:
+
+#     def __init__(self):
+#         pass
+
+
+
+
+# class Rectangle:
+
+#     def __init__(self, side_length, center):
+#         pass
+
+# class Triangle:
+
+#     def __init__(self, side_length, center):
+#         pass
+
+# class Circle:
+
+#     def __init__(self, side_length, center):
+#         pass
+
+# class Ellipse:
+
+#     def __init__(self, side_length, center):
+#         pass
+
+# class Spline:
+
+#     def __init__(self, side_length, center):
+#         pass
+
+# class Rectangle:
+
+#     def __init__(self, side_length, center):
+#         pass
