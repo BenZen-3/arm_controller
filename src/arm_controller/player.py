@@ -1,8 +1,6 @@
-# from .simulator import Recording
 import pygame
 import time
 import numpy as np
-import os
 
 WHITE =     (255, 255, 255)
 BLUE =      (  0,   0, 255)

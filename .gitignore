@@ -1,6 +1,7 @@
 # custom
 
 *.npy
+*.pkl
 .env
 
 # Byte-compiled / optimized / DLL files

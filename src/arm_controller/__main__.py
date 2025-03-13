@@ -20,7 +20,7 @@ def main():
     parser = argparse.ArgumentParser(description="Arm controller Package")
     parser.add_argument(
         '--mode', 
-        choices=['generator', 'trainer', 'predictor', 'playback', "auto_idiot", "controller"], 
+        choices=['generator', 'trainer', 'inference', 'playback', "auto_idiot", "controller"], 
         default='generator',
         help='Choose which module to run. Generate data, train on data, or predict a sequence from a random starting state'
     )
@@ -32,7 +32,7 @@ def main():
         generate_data()
     elif args.mode == 'trainer':
         train_model()
-    elif args.mode == 'predictor':
+    elif args.mode == 'inference':
         predict()
     elif args.mode == 'playback':
         playback_recording()
@@ -81,7 +81,7 @@ def predict(file=None):
     else:
 
         for data_file in utils.get_data_folder().iterdir():
-            if data_file.suffix == ".npz" and str(file) in str(data_file):
+            if data_file.suffix == ".pkl" and str(file) in str(data_file):
                 recording = Recording()
                 recording.init_from_file(data_file)
                 break
@@ -110,7 +110,7 @@ def playback_recording(rec_num=485):
 
     recs = []
     for sim_data_path in utils.get_data_folder().iterdir():
-        if sim_data_path.is_file() and sim_data_path.suffix == ".npz":
+        if sim_data_path.is_file() and sim_data_path.suffix == ".pkl":
             rec = Recording()
             rec.init_from_file(sim_data_path)
             recs.append(rec)
@@ -237,6 +237,27 @@ End Goal:
 Questions:
     What is a latent diffusion model and how is it any different?
     Should I use a variational autoencoder?
+
     
+Where am I going
+    I can make a GMM based off a few rectangles and gaussians if I want
+    Now I should take the arm sim and conver that into moving rectangles
+    Then convert the moving rectangles into moving GMM distributions
+    train on the moving distributions auto regressively and see what happens
+
+    after auto regression works
+    try it as a diffusion policy!
+
+
+
+    
+What did I install:
+    torch
+    pygame
+    dotenv
+    google-genai
+    matplotlib
+    scipy
+    scikit-learn
 
 """

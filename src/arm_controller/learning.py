@@ -38,7 +38,7 @@ class VideoDataset(Dataset):
         Loads recordings from the specified path and stores them in memory.
         """
         for num, file in enumerate(utils.get_data_folder().iterdir()):
-            if file.suffix == ".npz":
+            if file.suffix == ".pkl":
                 rec = Recording()
                 rec.init_from_file(file)
                 self.recordings.append(rec)
@@ -205,7 +205,7 @@ class FramePredictionModel(nn.Module):
         """
 
         # scaler = torch.amp.GradScaler("cuda")
-        scaler = torch.cuda.amp.GradScaler(enabled=True)
+        scaler = torch.amp.GradScaler(enabled=True)
 
 
         for epoch in range(num_epochs):

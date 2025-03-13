@@ -129,10 +129,6 @@ class Arm:
         """
         mini wrapper for the dynamics calcs so that RK4 can be run
         """
-        # note this flatten stuff was chatgpt and not verified. below is what I know is right
-        # M_inv = np.linalg.inv(M)
-        # q_dd = np.dot(M_inv, -C - G + U)
-        # return np.array([theta1_dot, theta2_dot, q_dd[0][0], q_dd[1][0]])
 
         self.state.theta1 = theta1
         self.state.theta2 = theta2
@@ -180,44 +176,6 @@ class Arm:
         """
 
         return self.cartesian_joint_locations()[2]
-    
-    # def kinematic_move(self, x, y, smooth = True):
-    #     """
-    #     purely kinematic move to x, y
-    #     """
-
-    #     t1_new, t2_new = self.inverse_kinematics(x, y)
-
-    #     if smooth: # TODO: This is like really probably a terrible horrible absolutely not good idea
-    #         state_copy = copy.deepcopy(self.state)
-    #         self.history.append(state_copy)
-
-    #         t1_history = []
-    #         t2_history = []
-
-    #         # get an array of the old thetas. tack the newest one on. smooth them. get the last one again...
-    #         for state in self.history: 
-    #             t1_old = state.theta1
-    #             t2_old = state.theta2
-
-    #             t1_history.append(t1_old)
-    #             t2_history.append(t2_old)
-
-    #         t1_history.append(t1_new)
-    #         t2_history.append(t2_new)
-
-    #         t1_smooth = self.smooth_angles(t1_history)[-1]
-    #         t2_smooth = self.smooth_angles(t2_history)[-1]
-
-    #         print(t1_smooth)
-
-    #         self.state.theta1 = t1_smooth
-    #         self.state.theta2 = t2_smooth
-
-    #     else:
-
-    #         self.state.theta1 = t1_new
-    #         self.state.theta2 = t2_new
 
     def kinematic_move(self, x, y, smooth=True):
         """
@@ -242,8 +200,8 @@ class Arm:
             t2_history.append(t2_new)
             
             # Smooth both angle sequences to maintain solution consistency
-            t1_smoothed = self.smooth_angles_AHH(t1_history)
-            t2_smoothed = self.smooth_angles_AHH(t2_history)
+            t1_smoothed = self.smooth_angles(t1_history)
+            t2_smoothed = self.smooth_angles(t2_history)
             
             # Use the latest smoothed angles
             self.state.theta1 = t1_smoothed[-1]
@@ -306,21 +264,21 @@ class Arm:
         
         return jacobian
 
-    def smooth_angles(self, angles): # TODO: THIS DOESNT BELONG HERE. THIS SCHEDULED FOR DEMOLITION
-        """
-        takes a list of angles and makes sure that the movements aren't insane
-        """
-        scalar_input = np.isscalar(angles)
-        angles = np.atleast_1d(angles)
-        diffs = np.diff(angles)
+    # def smooth_angles(self, angles): # TODO: THIS DOESNT BELONG HERE. THIS SCHEDULED FOR DEMOLITION
+    #     """
+    #     takes a list of angles and makes sure that the movements aren't insane
+    #     """
+    #     scalar_input = np.isscalar(angles)
+    #     angles = np.atleast_1d(angles)
+    #     diffs = np.diff(angles)
         
-        adjustments = np.cumsum(np.where(diffs > np.pi, -2*np.pi, np.where(diffs < -np.pi, 2*np.pi, 0)))
+    #     adjustments = np.cumsum(np.where(diffs > np.pi, -2*np.pi, np.where(diffs < -np.pi, 2*np.pi, 0)))
         
-        smoothed = angles[0] + np.concatenate(([0], adjustments))
-        return smoothed.item() if scalar_input else smoothed
+    #     smoothed = angles[0] + np.concatenate(([0], adjustments))
+    #     return smoothed.item() if scalar_input else smoothed
         
 
-    def smooth_angles_AHH(self, angles):
+    def smooth_angles(self, angles):
         """
         Takes a list of angles and ensures continuity by detecting and correcting large jumps
         that would indicate a flip between IK solutions.

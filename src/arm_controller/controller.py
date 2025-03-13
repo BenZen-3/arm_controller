@@ -1,6 +1,3 @@
-from .arm import Arm
-from abc import ABC, abstractmethod
-from enum import Enum
 import numpy as np
 import json
 
@@ -247,46 +244,3 @@ class DynamicArmController:
         control_T = M @ joint_accels
 
         return C.flatten() + G.flatten() + control_T
-
-# class Line:
-
-#     def __init__(self):
-#         pass
-
-# class Shape:
-
-#     def __init__(self):
-#         pass
-
-
-
-
-# class Rectangle:
-
-#     def __init__(self, side_length, center):
-#         pass
-
-# class Triangle:
-
-#     def __init__(self, side_length, center):
-#         pass
-
-# class Circle:
-
-#     def __init__(self, side_length, center):
-#         pass
-
-# class Ellipse:
-
-#     def __init__(self, side_length, center):
-#         pass
-
-# class Spline:
-
-#     def __init__(self, side_length, center):
-#         pass
-
-# class Rectangle:
-
-#     def __init__(self, side_length, center):
-#         pass

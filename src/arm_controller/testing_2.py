@@ -6,8 +6,6 @@ from scipy.stats import multivariate_normal
 from sklearn.mixture import GaussianMixture
 from sklearn.utils import check_random_state
 
-# GMM STUFF
-
 def sample_from_distribution(prob_dist, n_samples=10000, random_state=None):
     """
     Sample points from a 2D probability distribution.
@@ -131,8 +129,6 @@ def evaluate_gmm_on_grid(gmm, mesh_grid):
         probs = probs / np.max(probs)
     
     return probs
-
-# OLDER STUFF BELOW HERE
 
 def calculate_gaussian_field(mean_x, mean_y, cov_matrix, mesh_grid):
     """
@@ -534,7 +530,7 @@ def main_with_multiple_rectangles():
     )
     
     # Fit GMM to the distribution
-    n_components = 120  # Adjust based on complexity
+    n_components = 6  # Adjust based on complexity
     gmm, gaussian_params = fit_gmm_to_distribution(combined_prob, n_components=n_components, n_samples=n_components*1000)
     
     # Evaluate the fitted GMM on the grid

@@ -42,7 +42,7 @@ def clear_old_data():
     """
 
     for sim_data_path in get_data_folder().iterdir():
-        if sim_data_path.is_file() and sim_data_path.suffix == ".npz":
+        if sim_data_path.is_file() and sim_data_path.suffix == ".pkl":
             os.remove(sim_data_path)
 
 def clear_old_model():

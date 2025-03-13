@@ -8,6 +8,7 @@ import math
 from decimal import Decimal
 import multiprocessing as mp
 import json
+import pickle
 
 # TODO: Make the simulation freq different than the recording FPS
 
@@ -17,102 +18,108 @@ class VoxelState(Enum):
     """
     NO_FILL = 0
     FILLED_ARM = 255
-    # FILLED_OBSTACLE = 2
 
 
 class Recording:
-
     frame_dtype = np.uint8
 
     def __init__(self, prompt=None):
         """
-        init a recording
+        Initialize a recording
         """
-
         self.sim_prompt = prompt
-        
-        # self._frame_sequence = np.empty() # TODO: switch to a numpy array
         self._frame_sequence = []
-        self.metadata = {'date': '', 'frame_width': '', 'frame_height': '', 
-                         'voxel_size': '', 'fps': '', 'arm_L1': '', 
-                         'arm_L2': '', 'arm_M1': '', 'arm_M2': '',
-                         'sim_prompt': ''}
+        self._arm_state_history = []
+        
+        # Direct attributes instead of metadata dict
+        self.date = ''
+        self.frame_width = None
+        self.frame_height = None
+        self.voxel_size = None
+        self.fps = None
+        self.arm_l1 = None
+        self.arm_l2 = None
+        self.arm_m1 = None
+        self.arm_m2 = None
+        self.name = None
 
     def init_from_file(self, path):
         """
-        init the recording from a file
+        Initialize the recording from a pickled file
         """
-        
-        loaded_data = np.load(path, allow_pickle=True)
-        metadata = loaded_data['metadata'].item()
-        self._frame_sequence  = loaded_data['arr_0']
-        
-        # add metadata to the dict
-        for key, value in metadata.items():
-            self.metadata[key] = value
-
-        self.date = self.metadata['date']
-        self.frame_width = self.metadata['frame_width']
-        self.frame_height = self.metadata['frame_height']
-        self.voxel_size = self.metadata['voxel_size']
-        self.fps = self.metadata['fps']
-        self.sim_prompt = self.metadata['sim_prompt']
+        with open(path, 'rb') as file:
+            loaded_data = pickle.load(file)
+            
+        # Restore all attributes from the loaded object
+        self.__dict__.update(loaded_data.__dict__)
 
     def init_for_recording(self, frame_width, frame_height, voxel_size, fps, arm, name=None):
-
-        # everything in meters that can be. gather all metadata for storage
+        """
+        Initialize parameters for recording
+        """
         self.frame_width = frame_width
         self.frame_height = frame_height
         self.voxel_size = voxel_size
         self.fps = fps
-        self.arm = arm
+        
+        # Store arm parameters directly
+        self.arm_l1 = arm.l1
+        self.arm_l2 = arm.l2
+        self.arm_m1 = arm.m1
+        self.arm_m2 = arm.m2
+        
+        # Keep a reference to the arm for real-time recording
+        self._arm_reference = arm
+        
         self.date = utils.pretty_date()
-        self.gather_meta_data()
-
         self.name = name if name else f"simulation_data_{self.date}"
-
-    def gather_meta_data(self):
-        """
-        saves the metadata in the dict
-        """
-
-        self.metadata['date'] = str(self.date)
-        self.metadata['frame_width'] = self.frame_width
-        self.metadata['frame_height'] = self.frame_height
-        self.metadata['voxel_size'] = self.voxel_size
-        self.metadata['fps'] = self.fps
-        self.metadata['arm_L1'] = self.arm.l1
-        self.metadata['arm_L2'] = self.arm.l2
-        self.metadata['arm_M1'] = self.arm.m1
-        self.metadata['arm_M2'] = self.arm.m2
-        self.metadata['sim_prompt'] = self.sim_prompt
 
     def record_frame(self, voxel_grid):
         """
-        copies the voxel array and appends it to the frame seq
+        Copies the voxel array and appends it to the frame sequence
         """
         self._frame_sequence.append(np.copy(voxel_grid))
 
+    def record_angles(self, theta_1, theta_2):
+        """
+        Records arm state
+        """
+        state = (theta_1, theta_2)
+        self._arm_state_history.append(state)
+
     def save(self, id=0, save_folder=None):
         """
-        save the file
+        Save the object using pickle
         """
+        save_path = save_folder.joinpath(f"{id}_{self.name}.pkl")
+        with open(save_path, 'wb') as file:
+            # Remove the _arm_reference before pickling if it exists
+            # to avoid serializing the entire arm object
+            if hasattr(self, '_arm_reference'):
+                arm_ref = self._arm_reference
+                self._arm_reference = None
+                pickle.dump(self, file)
+                self._arm_reference = arm_ref
+            else:
+                pickle.dump(self, file)
 
-        self.gather_meta_data()
-        save_path = save_folder.joinpath(f"{id}_{self.name}")
-        np.savez(save_path, self._frame_sequence, metadata=self.metadata)
-
-    # TODO: check that this is used properly external to this class... also possiblly remove once np array is used for frame seq
     @property
     def frame_sequence(self): 
         """
-        frame sequence getter. always return array
+        Frame sequence getter. Always return array
         """
         return np.asarray(self._frame_sequence)
+    
+    @property
+    def arm_state_history(self):
+        """
+        Arm state history getter
+        """
+        return self._arm_state_history
 
     def get_float_frame_seq(self):
         """
-        model requires float32. this stores as uint8. output as float32
+        Model requires float32. This stores as uint8. Output as float32
         """
         normalize_factor = np.float32(np.iinfo(self.frame_dtype).max)
         return self.frame_sequence.astype(np.float32) / normalize_factor
@@ -120,9 +127,8 @@ class Recording:
     @classmethod
     def frame_printer(cls, frame):
         """
-        pretty printer for a frame
+        Pretty printer for a frame
         """
-
         for row in np.flipud(frame):
             row_output = ""
             for voxel in row:
@@ -130,8 +136,17 @@ class Recording:
                     row_output += "-"
                 else:
                     row_output += " "
-
             print(row_output)
+            
+    @classmethod
+    def load(cls, path):
+        """
+        Class method to load a recording from a file
+        """
+        with open(path, 'rb') as file:
+            return pickle.load(file)
+
+
 
 
 class Simulator:
@@ -201,17 +216,18 @@ class Simulator:
         """
 
         self.running = True
-        frame_time = 1/self.fps
+        dt = 1/self.fps
         total_time = 0
         
         while self.running:
 
-            self.control_arm(frame_time)
+            self.control_arm(dt)
             self.fill_arm_voxels()
             self.recording.record_frame(self.voxels)
+            self.recording.record_angles(self.arm.state.theta1, self.arm.state.theta2)
 
             # timing, can put in while loop if nothing else breaks the total time?
-            total_time += frame_time
+            total_time += dt
             if total_time >= sim_time and not self.external_control: self.running = False
 
         return self.recording
@@ -340,7 +356,7 @@ class BatchProcessor:
             recording.save(sim_id, save_path)
         return sim_id, recording
 
-    def batch_process(self, prompts=None):
+    def batch_process(self):
         """
         Run all simulations in parallel and collect the results.
         
@@ -361,6 +377,14 @@ class BatchProcessor:
 
         return results
 
+
+
+
+
+
+
+
+
 def run_controller_sim(all_json_input):
 
     print("running controller")
@@ -379,29 +403,6 @@ def run_controller_sim(all_json_input):
         sim = Simulator(width, height, voxel_size, arm, controller)
         player = SimulationPlayer(800, 800)
         player.realtime_play(sim)
-
-
-# def generate_sim_data(all_json_input):
-#     print("running controller")
-
-#     width=4.2
-#     height=4.2
-#     voxel_size=0.065625
-#     t1, t2 = -np.pi/2, np.pi/2
-#     save_path = "/data/sim_data"
-
-#     for sim_id, json_trajectory in enumerate(all_json_input):
-
-#         arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=9.8)
-#         arm_trajectory = ArmTrajectory(json_trajectory)
-#         controller = KinematicController(arm, arm_trajectory)
-#         sim = Simulator(width, height, voxel_size, arm, controller)
-
-#         recording = sim.run()
-#         if save_path is not None:
-#             recording.save(sim_id, save_path)
-        
-
 
 def run_single_simulation(sim_id, json_trajectory, save_path, width=4.2, height=4.2, voxel_size=0.065625):
     t1, t2 = -np.pi/2, np.pi/2
@@ -430,11 +431,3 @@ def generate_sim_data(all_json_input):
     
     return results
 
-
-
-
-
-
-
-if __name__ == "__main__":
-    pass
