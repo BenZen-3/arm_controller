@@ -9,6 +9,8 @@ from decimal import Decimal
 import multiprocessing as mp
 import json
 import pickle
+from .gmm_estimation import arm_2d_distributions
+
 
 # TODO: Make the simulation freq different than the recording FPS
 
@@ -431,3 +433,20 @@ def generate_sim_data(all_json_input):
     
     return results
 
+
+
+
+
+def distribution_view():
+
+    print("running controller")
+
+    width=4.2
+    height=4.2
+    voxel_size=0.065625
+    t1, t2 = -np.pi/2, np.pi/2
+
+    arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=9.8)
+
+    sim = Simulator(width, height, voxel_size, arm)
+    arm_2d_distributions(arm, sim)

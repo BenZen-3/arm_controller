@@ -6,11 +6,12 @@ import numpy as np
 
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
-from .simulator import BatchProcessor, Recording, run_controller_sim, generate_sim_data
+from .simulator import BatchProcessor, Recording, run_controller_sim, generate_sim_data, distribution_view
 from .language_generator import gather_llm_responses, load_all_llm_data
 from .learning import  main_train, main_predict
 from .player import SimulationPlayer
 from . import utils
+from .gmm_estimation import arm_to_rectangles
 
 def main():
     """
@@ -20,7 +21,7 @@ def main():
     parser = argparse.ArgumentParser(description="Arm controller Package")
     parser.add_argument(
         '--mode', 
-        choices=['generator', 'trainer', 'inference', 'playback', "auto_idiot", "controller"], 
+        choices=['generator', 'trainer', 'inference', 'playback', "auto_idiot", "testing"], 
         default='generator',
         help='Choose which module to run. Generate data, train on data, or predict a sequence from a random starting state'
     )
@@ -38,9 +39,10 @@ def main():
         playback_recording()
     elif args.mode == 'auto_idiot':
         auto_idiot()
-    elif args.mode == 'controller':
+    elif args.mode == 'testing':
         # llm_controller()
-        gen_sim_data()
+        # gen_sim_data()
+        testing()
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
@@ -152,6 +154,10 @@ def gen_sim_data():
     data = load_all_llm_data()
     generate_sim_data(data)
 
+
+def testing():
+
+    distribution_view()
 
 
 

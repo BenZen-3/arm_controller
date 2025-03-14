@@ -160,7 +160,7 @@ class SDFRectangle(ProbabilityDistribution):
     """
     
     def __init__(self, center_x, center_y, width, height, angle=0.0, 
-                 smoothing=0.0, mesh_grid=None, grid_size=100, plot_range=(-5, 5)):
+                 mesh_grid=None, grid_size=100, plot_range=(-5, 5), dropoff = 1):
         """
         Initialize a rectangle SDF probability distribution.
         
@@ -176,8 +176,6 @@ class SDFRectangle(ProbabilityDistribution):
             Height of the rectangle
         angle : float, optional
             Rotation angle in radians (default: 0.0)
-        smoothing : float, optional
-            Sigma parameter for Gaussian smoothing (default: 0.0)
         mesh_grid : tuple, optional
             Tuple containing (X, Y) meshgrid arrays. If None, will create a new meshgrid.
         grid_size : int, optional
@@ -192,7 +190,7 @@ class SDFRectangle(ProbabilityDistribution):
         self.width = width
         self.height = height
         self.angle = angle
-        self.smoothing = smoothing
+        self.dropoff = dropoff
         
         # Cache the SDF and probability
         self._sdf = None
@@ -269,7 +267,7 @@ class SDFRectangle(ProbabilityDistribution):
         # For points outside the rectangle
         dx = np.maximum(np.abs(X_for_sdf - self.center_x) - half_width, 0)
         dy = np.maximum(np.abs(Y_for_sdf - self.center_y) - half_height, 0)
-        outside_distance = np.sqrt(dx**2 + dy**2)
+        outside_distance = np.sqrt(dx**2 + dy**2)*self.dropoff
         
         # Calculate the inside distance (negative values)
         inside_x = half_width - np.abs(X_for_sdf - self.center_x)
@@ -282,10 +280,6 @@ class SDFRectangle(ProbabilityDistribution):
         sdf = np.where((np.abs(X_for_sdf - self.center_x) <= half_width) & 
                       (np.abs(Y_for_sdf - self.center_y) <= half_height),
                       inside_distance, outside_distance)
-        
-        # Apply smoothing if requested
-        if self.smoothing > 0:
-            sdf = gaussian_filter(sdf, sigma=self.smoothing)
         
         # Truncate values
         sdf = np.clip(sdf, -1, 1)
@@ -300,10 +294,10 @@ class SDFRectangle(ProbabilityDistribution):
         Returns:
         -------
         tuple
-            (center_x, center_y, width, height, angle, smoothing)
+            (center_x, center_y, width, height, angle, dropoff)
         """
         return (self.center_x, self.center_y, self.width, self.height, 
-                self.angle, self.smoothing)
+                self.angle, self.dropoff)
 
 
 class GaussianDistribution(ProbabilityDistribution):
@@ -1181,6 +1175,88 @@ def main_simple():
     print(f"Maximum Error: {metrics['max_error']:.6f}")
     
     # Show all plots
+    plt.show()
+
+def arm_to_rectangles(mesh_grid, arm):
+
+    width_1, width_2 = arm.l1, arm.l2
+    height_1, height_2 = .05, .05
+    dropoff = 4.0
+
+    # rectangle numero uno
+    x1 = arm.state.x0 - arm.l1/2 * np.cos(arm.state.theta1)
+    y1 = arm.state.y0 + arm.l1/2 * np.sin(arm.state.theta1)
+    angle = arm.state.theta1
+    lower_arm = SDFRectangle(x1, y1, width_1, height_1, angle, mesh_grid=mesh_grid, dropoff=dropoff)
+
+    # rectangle numero dos
+    x2 =  arm.state.x0 - arm.l1 * np.cos(arm.state.theta1) - arm.l2/2 * np.cos(arm.state.theta1 + arm.state.theta2)
+    y2 = arm.state.y0 + arm.l1 * np.sin(arm.state.theta1) + arm.l2/2 * np.sin(arm.state.theta1 + arm.state.theta2)
+    angle = arm.state.theta1 + arm.state.theta2
+    upper_arm = SDFRectangle(x2, y2, width_2, height_2, angle, mesh_grid=mesh_grid, dropoff=dropoff)
+
+    combined = CombinedDistribution(distributions=[lower_arm, upper_arm], mesh_grid=mesh_grid, method='max')
+    return combined
+
+def arm_2d_distributions(arm, sim):
+
+    mesh_grid = ProbabilityDistribution.create_mesh_grid(grid_size=64, plot_range=(0, 4.2))  # Reduced grid size
+    X, Y = mesh_grid
+
+    # Setup the figure for animation
+    fig, (ax_rect, ax_gmm) = plt.subplots(1, 2, figsize=(12, 6))
+
+    # Initialize GMM fitter
+    fitter = GaussianFitter(n_components=4)
+
+    # Initialize heatmap plots using pcolormesh
+    rect_field = np.zeros_like(X)
+    gmm_field = np.zeros_like(X)
+    
+    rect_mesh = ax_rect.pcolormesh(X, Y, rect_field, cmap='viridis', shading='auto')
+    gmm_mesh = ax_gmm.pcolormesh(X, Y, gmm_field, cmap='plasma', shading='auto')
+    
+    # Initialize scatter plot for Gaussian centers
+    scatter_gaussians, = ax_gmm.plot([], [], 'ro', markersize=5)
+
+    # Number of frames and total angle to rotate
+    n_frames = 72000  # 36 frames per rotation * 2 rotations
+    # rotations = 2  # Number of full rotations
+
+    def update(frame):
+
+        sim.control_arm(1/10)
+
+        combined = arm_to_rectangles(mesh_grid, arm)
+        rect_field = combined.get_probability()
+
+        # Update rectangle heatmap properly
+        rect_mesh.set_array(rect_field.ravel())
+        rect_mesh.set_clim(vmin=np.min(rect_field), vmax=np.max(rect_field))
+        ax_rect.set_title(f"SDF Arm")
+
+        # Fit GMM
+        # start = time.time()
+        fitter.fit(combined, n_samples=500)  # Reduced sample count
+        gmm_distribution = fitter.create_gmm_distribution(mesh_grid=mesh_grid)
+        gmm_field = gmm_distribution.get_probability()
+        # print(f"GMM fit time: {time.time() - start:.4f} sec")
+
+        # Update GMM heatmap
+        gmm_mesh.set_array(gmm_field.ravel())
+        gmm_mesh.set_clim(vmin=np.min(gmm_field), vmax=np.max(gmm_field))
+        ax_gmm.set_title(f"GMM Approximation")
+
+        # Update Gaussian scatter points
+        gaussian_params = gmm_distribution.get_gaussian_params()
+        scatter_gaussians.set_data([g[0] for g in gaussian_params], [g[1] for g in gaussian_params])
+
+        return rect_mesh, gmm_mesh, scatter_gaussians
+
+    # Create animation with blitting
+    ani = FuncAnimation(fig, update, frames=n_frames, interval=0, blit=False, repeat=False)
+
+    plt.tight_layout()
     plt.show()
 
 

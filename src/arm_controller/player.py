@@ -44,7 +44,7 @@ class SimulationPlayer:
             frame = sim.recording.frame_sequence[-1]/255 # get the final frame
 
             self.check_quit()
-            #self.draw_frame(frame)
+            self.draw_frame(frame)
 
             if trace: 
                 ee_pos = sim.arm.cartesian_EE_location()
