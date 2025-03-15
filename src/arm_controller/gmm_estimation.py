@@ -948,6 +948,72 @@ class ProbabilityViewer:
         
         return fig, metrics
 
+
+class ArmFitter:
+
+    def __init__(self, arm, n_gaussians=4, gaussian_dropoff=4.0):
+
+        self._arm_ref = arm
+        self.dropoff = gaussian_dropoff
+
+        self.mesh_grid = ProbabilityDistribution.create_mesh_grid(grid_size=64, plot_range=(0, 4.2))  # Reduced grid size
+        self.fitter = GaussianFitter(n_components=n_gaussians)
+
+    def fit_arm(self, n_samples=500):
+        """
+        fits the arm's sdf probability distribution to a gaussian mixture model. 
+        
+        returns list of gaussian parans
+        """
+        
+        # create a combined distribution and fit it with gaussians
+        combined_dist = self.arm_sdf()
+        gmm_dist = self.fitter.fit(combined_dist, n_samples=n_samples)
+        params = gmm_dist.get_gaussian_params()
+
+        return params
+
+    def arm_sdf(self):
+        """
+        get that SDF baby!
+        """
+
+        arm = self._arm_ref
+        width_1, width_2 = arm.l1, arm.l2
+        height = .05
+
+        # rectangle numero uno
+        x1 = arm.state.x0 - arm.l1/2 * np.cos(arm.state.theta1)
+        y1 = arm.state.y0 + arm.l1/2 * np.sin(arm.state.theta1)
+        angle = arm.state.theta1
+        lower_arm = SDFRectangle(x1, y1, width_1, height, angle, mesh_grid=self.mesh_grid, dropoff=self.dropoff)
+
+        # rectangle numero dos
+        x2 =  arm.state.x0 - arm.l1 * np.cos(arm.state.theta1) - arm.l2/2 * np.cos(arm.state.theta1 + arm.state.theta2)
+        y2 = arm.state.y0 + arm.l1 * np.sin(arm.state.theta1) + arm.l2/2 * np.sin(arm.state.theta1 + arm.state.theta2)
+        angle = arm.state.theta1 + arm.state.theta2
+        upper_arm = SDFRectangle(x2, y2, width_2, height, angle, mesh_grid=self.mesh_grid, dropoff=self.dropoff)
+
+        combined = CombinedDistribution(distributions=[lower_arm, upper_arm], mesh_grid=self.mesh_grid, method='max')
+        return combined
+
+
+# everything past here is like testing and shit
+
+class DAWG:
+
+    def __init__(self):
+        pass
+
+    def whosagoodboy(self):
+        return "WOOF"
+    
+    def whoslosingtheirmind(self):
+        return "ME"
+
+
+
+
 def main_2d():
     # Make distributions
     mesh_grid = ProbabilityDistribution.create_mesh_grid(grid_size=50, plot_range=(-5, 5))  # Reduced grid size
@@ -1197,6 +1263,8 @@ def arm_to_rectangles(mesh_grid, arm):
 
     combined = CombinedDistribution(distributions=[lower_arm, upper_arm], mesh_grid=mesh_grid, method='max')
     return combined
+
+
 
 def arm_2d_distributions(arm, sim):
 

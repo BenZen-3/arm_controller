@@ -46,7 +46,7 @@ def main():
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
-def generate_data(num_sims=500, sim_time=20, clear_prev_data=True):
+def generate_data(num_sims=10, sim_time=20, clear_prev_data=True):
     """
     generate data for training
 

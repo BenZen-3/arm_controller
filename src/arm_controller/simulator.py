@@ -9,7 +9,9 @@ from decimal import Decimal
 import multiprocessing as mp
 import json
 import pickle
-from .gmm_estimation import arm_2d_distributions
+from .gmm_estimation import arm_2d_distributions, ArmFitter
+import copy
+
 
 
 # TODO: Make the simulation freq different than the recording FPS
@@ -32,6 +34,7 @@ class Recording:
         self.sim_prompt = prompt
         self._frame_sequence = []
         self._arm_state_history = []
+        self._gaussian_mixture_model = []
         
         # Direct attributes instead of metadata dict
         self.date = ''
@@ -81,6 +84,22 @@ class Recording:
         Copies the voxel array and appends it to the frame sequence
         """
         self._frame_sequence.append(np.copy(voxel_grid))
+
+    def record_gaussian_fit(self, gaussian_list):
+        """
+        copies the gaussian params list to the GMM.
+
+        result:     
+                    [
+            Time 0  [(Gaussian 0's params), (Gaussian 1's params), ...],
+            Time 1  [(Gaussian 0's params), (Gaussian 1's params), ...],
+            Time 2  [(Gaussian 0's params), (Gaussian 1's params), ...],
+            ...
+                    ]
+        """
+
+        copied_list = copy.copy(gaussian_list) # TBH idek if this is necessary
+        self._gaussian_mixture_model.append(copied_list)
 
     def record_angles(self, theta_1, theta_2):
         """
@@ -149,8 +168,6 @@ class Recording:
             return pickle.load(file)
 
 
-
-
 class Simulator:
 
     def __init__(self, width, height, voxel_size, arm, controller=None):
@@ -175,6 +192,9 @@ class Simulator:
         # recording
         self.recording = Recording()
         self.recording.init_for_recording(self.width, self.height, self.voxel_size, self.fps, self.arm)
+
+        # arm GMM fitter
+        self.arm_fitter = ArmFitter(self.arm)
 
     def check_conditions(self):
         """
@@ -227,6 +247,10 @@ class Simulator:
             self.fill_arm_voxels()
             self.recording.record_frame(self.voxels)
             self.recording.record_angles(self.arm.state.theta1, self.arm.state.theta2)
+
+
+            gmm_params = self.arm_fitter.fit_arm()
+            self.recording.record_gaussian_fit(gmm_params)
 
             # timing, can put in while loop if nothing else breaks the total time?
             total_time += dt
@@ -433,10 +457,6 @@ def generate_sim_data(all_json_input):
     
     return results
 
-
-
-
-
 def distribution_view():
 
     print("running controller")
@@ -450,3 +470,25 @@ def distribution_view():
 
     sim = Simulator(width, height, voxel_size, arm)
     arm_2d_distributions(arm, sim)
+
+
+
+
+def run_single_simulation(sim_id, json_trajectory, save_path, width=4.2, height=4.2, voxel_size=0.065625):
+    t1, t2 = -np.pi/2, np.pi/2
+    
+    arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=9.8)
+    arm_trajectory = ArmTrajectory(json_trajectory)
+    controller = KinematicController(arm, arm_trajectory)
+    sim = Simulator(width, height, voxel_size, arm, controller)
+    
+    recording = sim.run()
+    if save_path is not None:
+        recording.sim_prompt = json_trajectory['text_prompt']
+        recording.save(sim_id, save_path)
+    
+    return sim_id, recording
+
+
+
+
