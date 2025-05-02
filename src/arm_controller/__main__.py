@@ -46,7 +46,7 @@ def main():
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
-def generate_data(num_sims=10, sim_time=20, clear_prev_data=True):
+def generate_data(num_sims=500, sim_time=20, clear_prev_data=True):
     """
     generate data for training
 
@@ -107,7 +107,7 @@ def predict(file=None):
 
 
 # this is temp and this is trash code
-def playback_recording(rec_num=485):
+def playback_recording(rec_num=0):
     print("Playing recording")
 
     recs = []
@@ -254,9 +254,10 @@ Where am I going
     after auto regression works
     try it as a diffusion policy!
 
+Timing:
+    500 sims at 20 seconds a piece, running 30fps averages almost exactly 2 seconds per sim. 1001 seconds total.
 
 
-    
 What did I install:
     torch
     pygame

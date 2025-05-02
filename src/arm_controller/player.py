@@ -81,14 +81,16 @@ class SimulationPlayer:
 
         self.setup_to_play(recording)
 
-        frame_time = 1/recording.fps
+        frame_time = 1/recording.fps * 10
         self.running = True
 
-        for frame in recording.frame_sequence:
+        for i, frame in enumerate(recording.frame_sequence):
 
             frame_start = time.time()
 
             self.check_quit()
+            mix = recording.gmm_history[i]
+            self.plot_gaussians(mix)
             self.draw_frame(frame)
 
             time_taken = time.time() - frame_start
@@ -110,6 +112,14 @@ class SimulationPlayer:
         num_vox_width = size[1]
         num_vox_height = size[2]
         self.voxel_size = min(self.width // num_vox_width, self.height // num_vox_height)
+
+    def plot_gaussians(self, mix):
+
+        for gaussian_params in mix:
+            x = -gaussian_params[0] *  64 * 12 / 4.2 + self.width
+            y = -gaussian_params[1] *  64 * 12 / 4.2 + self.height
+
+            pygame.draw.circle(self.screen, RED, (x,y), 4)
 
     def draw_frame(self, frame):
 

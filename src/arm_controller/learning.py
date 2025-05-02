@@ -7,7 +7,6 @@ import torch.nn.functional as F
 from . import utils
 import numpy as np
 from os import listdir
-import time # REMOVE LATER
 
 # TODO find better name for num_label_frames
 
@@ -293,6 +292,7 @@ class FramePredictionModel(nn.Module):
         model = FramePredictionModel(num_input_frames=num_input_frames, num_label_frames=num_label_frames, device=device)
         model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
         return model.to(device)
+
 
 def main_train(use_stored_model=None):
     """

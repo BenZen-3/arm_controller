@@ -132,6 +132,10 @@ class Recording:
         return np.asarray(self._frame_sequence)
     
     @property
+    def gmm_history(self):
+        return self._gaussian_mixture_model
+
+    @property
     def arm_state_history(self):
         """
         Arm state history getter
@@ -474,20 +478,20 @@ def distribution_view():
 
 
 
-def run_single_simulation(sim_id, json_trajectory, save_path, width=4.2, height=4.2, voxel_size=0.065625):
-    t1, t2 = -np.pi/2, np.pi/2
+# def run_single_simulation(sim_id, json_trajectory, save_path, width=4.2, height=4.2, voxel_size=0.065625):
+#     t1, t2 = -np.pi/2, np.pi/2
     
-    arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=9.8)
-    arm_trajectory = ArmTrajectory(json_trajectory)
-    controller = KinematicController(arm, arm_trajectory)
-    sim = Simulator(width, height, voxel_size, arm, controller)
+#     arm = Arm(x0=width / 2, y0=height / 2, theta1=t1, theta2=t2, l1=1, l2=1, m1=1, m2=1, g=9.8)
+#     arm_trajectory = ArmTrajectory(json_trajectory)
+#     controller = KinematicController(arm, arm_trajectory)
+#     sim = Simulator(width, height, voxel_size, arm, controller)
     
-    recording = sim.run()
-    if save_path is not None:
-        recording.sim_prompt = json_trajectory['text_prompt']
-        recording.save(sim_id, save_path)
+#     recording = sim.run()
+#     if save_path is not None:
+#         recording.sim_prompt = json_trajectory['text_prompt']
+#         recording.save(sim_id, save_path)
     
-    return sim_id, recording
+#     return sim_id, recording
 
 
 

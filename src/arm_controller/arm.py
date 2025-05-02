@@ -51,6 +51,14 @@ physically grounded by a sim - a great benefit of an MPC - while having the exce
 
 
 
+--- Random Idea ---
+
+anthropromorphic hand made with linear servos
+the linear servos dont individually have force feedback but there is a differential mechanism that gives force feedback based on the 
+force/torque response of a combination of actuators
+what if instead of a torque sensor, it was a camera and a flexure
+that would be hella cheap
+
 """
 
 
