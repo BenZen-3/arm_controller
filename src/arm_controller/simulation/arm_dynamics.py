@@ -98,9 +98,11 @@ class Arm:
         """
 
         # get the control torques
-        U = self.bus.get_state("controller/controller_torque_state")
-        if U is None:
+        torque_state = self.bus.get_state("controller/controller_torque_state")
+        if torque_state is None:
             U = np.zeros(2)
+        else: 
+            U = torque_state.torques
 
         dt = msg.dt
 

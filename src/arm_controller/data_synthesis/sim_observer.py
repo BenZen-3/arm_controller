@@ -25,8 +25,8 @@ class Observer(ABC):
 
     def save(self):
         
-        save_path = self.bus.get_state("common/data_directory")
-        id = self.bus.get_state("sim/id")
+        save_path = self.bus.get_state("common/data_directory").path
+        id = self.bus.get_state("sim/sim_state").id
         generic_name = "simulation"
 
         save_path = save_path.joinpath(f"{id}_{generic_name}.pkl")

@@ -10,12 +10,14 @@ class Controller(ABC):
     """Abstract base class for all controllers that output joint torques."""
 
     def __init__(self, message_bus: MessageBus, frequency: int = None):
+
         self.bus = message_bus
         self.bus.subscribe("sim/controller_update", self.controller_update)
 
         # set frequency
         if frequency is None:
             msg = self.bus.get_state("sim/sim_state")
+            print(msg)
             self.frequency = msg.frequency
 
     def controller_update(self, msg: TimingMessage):

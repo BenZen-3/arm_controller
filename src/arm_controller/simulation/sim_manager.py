@@ -1,11 +1,12 @@
 from arm_controller.core.message_bus import MessageBus
 from arm_controller.core.subscriber import Subscriber
 from arm_controller.core.publisher import Publisher
-from arm_controller.core.message_types import Message, NumberMessage, ListMessage, SimStateMessage, JointTorqueMessage, TimingMessage, JointStateMessage, CartesianMessage
+from arm_controller.core.message_types import NumberMessage, SimStateMessage, TimingMessage, CartesianMessage
 
 from arm_controller.simulation.arm_dynamics import Arm
 from arm_controller.simulation.arm_controller import Controller, NoController
-from arm_controller.data_synthesis.sim_observer import JointStateObserver
+from arm_controller.data_synthesis.sim_observer import JointStateObserver, Observer
+
 
 import numpy as np
 import multiprocessing as mp
@@ -32,7 +33,7 @@ class SimManager:
 
         # branch the global bus to keep all messages on the global bus
         sim_bus = self.bus.branch_bus()
-        sim_bus.set_state("sim/id", NumberMessage(sim_id))
+        sim_bus.set_state("sim/sim_state", SimStateMessage(sim_id, frequency, total_time, False))
         
         # should load the params from something like a yaml instead
         arm = Arm(sim_bus)
@@ -68,28 +69,25 @@ class SimManager:
             for sim_id, recording in pool.starmap(self.run_single_simulation, tasks):
                 results[sim_id] = recording
 
-        # return results
-        pass
+        return results
 
 
 class Simulation:
     """Class for running a single simulation"""
 
-    def __init__(self, message_bus: MessageBus, total_time: float, frequency: int, arm: Arm, controller: Controller):
+    def __init__(self, message_bus: MessageBus, total_time: float, frequency: int, arm: Arm, controller: Controller, observer: Observer=None):
 
         self.bus = message_bus
         self.total_time = total_time
         self.sim_frequency = frequency
         self.arm = arm
         self.controller = controller
+        self.observer = observer
 
         # all the simulation publishing stuffs
         self.dynamics_update_publisher = Publisher(self.bus, "sim/dynamics_update")
         self.controller_update_publisher = Publisher(self.bus, "sim/controller_update")
         self.observer_update_publsiher = Publisher(self.bus, "sim/observer_update")
-
-        sim_state_msg = SimStateMessage(self.sim_frequency, self.total_time, False)
-        self.bus.set_state("sim/sim_state", sim_state_msg)
 
     def run(self):
         """
@@ -100,11 +98,11 @@ class Simulation:
             recorders/observers: checks for posted arm_state, goal_state, controller_torque_state. Runs what it needs to
         """
 
-        num_ticks = self.total_time // self.sim_frequency
+        num_ticks = self.total_time * self.sim_frequency
         dt = 1/self.sim_frequency
         self.set_sim_state_running(True)
 
-        # these things can be at different frequenies than the actual simulation
+        # these things can be at different frequenies than the actual simulation, update this later 
         goal_update = True
         controller_update = True
         observer_update = True
@@ -120,9 +118,8 @@ class Simulation:
             if controller_update:
                 self.controller_update_publisher.publish(TimingMessage(current_time, dt))
 
-            if observer_update:
+            if self.observer and observer_update:
                 self.observer_update_publsiher.publish(TimingMessage(current_time, dt))
-
 
         self.set_sim_state_running(False)
 

@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import List, Any
+from typing import List, Any, Union
 from pathlib import Path
 from dataclasses import dataclass
 import numpy as np
+from pathlib import Path
+
 
 class Message(ABC):
     """Base class for all messages."""
@@ -33,21 +35,6 @@ class NumberMessage(float, Message):
     def __repr__(self):
         return super().__repr__()
     
-class FilePath(Path, Message): # SHOULD BE TESTED. THIS SEEMS WONKY
-    """Class for file path-based messages."""
-    
-    def __new__(cls, path: str) -> 'FilePath':
-        """Initialize with a valid file path."""
-        if not isinstance(path, str):
-            raise TypeError("FilePath expects a string representing the file path.")
-        
-        # Initialize the parent class (Path)
-        return super().__new__(cls, path)
-
-    def __repr__(self):
-        """Return a string representation of the file path."""
-        return f"FilePath({str(self)})"
-    
 class StringMessage(str, Message):
     def __new__(cls, text: str):
         """Ensure the text is a valid string message."""
@@ -69,28 +56,19 @@ class DictMessage(dict, Message):
         # Create and return a new instance of the subclass (which will be a dict object)
         return super().__new__(cls, data)
 
-def __repr__(self):
-        return super().__repr__()
+    def __repr__(self):
+            return super().__repr__()
 
 @dataclass(frozen=False)
 class SimStateMessage(Message):
+    id: int
     frequency: int
     duration: float
     running: bool
 
     def __repr__(self):
-        return f"SimStateMessage(freq={self.freq}, duration={self.duration}, running={self.running})"
+        return f"SimStateMessage(id={self.id}, freq={self.frequency}, duration={self.duration}, running={self.running})"
 
-
-class JointTorqueMessage(Message):
-    def __init__(self, t1, t2):
-        """class for joint torques"""
-        self._t1 = t1
-        self._t2 = t2
-
-    @property
-    def torques(self):
-        return np.array([self._t1, self._t2])
 
 class TimingMessage(Message):
     def __init__(self, current_time: float, dt: float):
@@ -109,23 +87,6 @@ class TimingMessage(Message):
     def __repr__(self):
         return f"TimingMessage: Current Time: {self.current_time}, dt: {self.dt}"
     
-# class JointStateMessage(Message):
-#     def __init__(self, theta_1: float, theta_2: float):
-#         """class for joint states message"""
-#         self._theta_1 = theta_1
-#         self._theta_2 = theta_2
-
-#     @property
-#     def theta_1(self):
-#         return self._theta_1
-
-#     @property
-#     def theta_2(self):
-#         return self._theta_2
-
-#     def __repr__(self):
-#         return f"JointStateMessage: theta_1: {self.theta_1}, theta_2: {self.theta_2}"
-
 @dataclass(frozen=True)
 class ArmStateMessage(Message):
     """
@@ -139,16 +100,112 @@ class ArmStateMessage(Message):
     theta_1_dot: float
     theta_2_dot: float
 
-def __repr__(self):
-    return (f"ArmStateMessage(x_0={self.x_0}, y_0={self.y_0}, "
-            f"theta_1={self.theta_1}, theta_2={self.theta_2}, "
-            f"theta_1_dot={self.theta_1_dot}, theta_2_dot={self.theta_2_dot})")
+    def __repr__(self):
+        return (f"ArmStateMessage(x_0={self.x_0}, y_0={self.y_0}, "
+                f"theta_1={self.theta_1}, theta_2={self.theta_2}, "
+                f"theta_1_dot={self.theta_1_dot}, theta_2_dot={self.theta_2_dot})")
 
 
 @dataclass(frozen=True)
-class CartesianMessage(Message):
-    x: float
-    y: float
+class PathMessage(Message):
+    """A message that wraps a Path object for safe transport."""
+    path: Path
 
     def __repr__(self):
-        return f"CartesianMessage(x={self.x}, y={self.y})"
+        return f"PathMessage(path='{self.path}')"
+
+
+class JointTorqueMessage(Message):
+    def __init__(self, t1, t2):
+        """class for joint torques"""
+        self._t1 = t1
+        self._t2 = t2
+
+    @property
+    def torques(self):
+        return np.array([self._t1, self._t2])
+    
+    def __repr__(self) -> str:
+        return f"TorqueMessage(t1={self._t1}, t2={self._t2})"
+
+
+# @dataclass(frozen=True)
+# class CartesianMessage(Message):
+#     x: float
+#     y: float
+
+#     def __repr__(self):
+#         return f"CartesianMessage(x={self.x}, y={self.y})"
+
+# @dataclass
+# class CartesianMessage(Message):
+#     x: float = 0.0
+#     y: float = 0.0
+
+#     def __init__(self, x: Union[float, np.ndarray], y: float = None):
+#         if isinstance(x, np.ndarray):
+#             arr = np.squeeze(x)
+#             if arr.shape == (2,):
+#                 self.x = float(arr[0])
+#                 self.y = float(arr[1])
+#             else:
+#                 raise ValueError(f"Expected numpy array with shape (2,) or (1,2), got shape {arr.shape}")
+#         elif isinstance(x, (float, int)) and isinstance(y, (float, int)):
+#             self.x = float(x)
+#             self.y = float(y)
+#         else:
+#             raise TypeError("CartesianMessage requires either two floats or a numpy array of shape (2,)")
+
+#     @property
+#     def point(self) -> np.ndarray:
+#         return np.array([self.x, self.y])
+
+#     def __repr__(self):
+#         return f"CartesianMessage(x={self.x}, y={self.y})"
+
+class TwoFloatMessage(Message, ABC):
+    def __init__(self, a: Union[float, np.ndarray], b: float = None, name_a="a", name_b="b"):
+        if isinstance(a, np.ndarray):
+            arr = np.squeeze(a)
+            if arr.shape == (2,):
+                self._a = float(arr[0])
+                self._b = float(arr[1])
+            else:
+                raise ValueError(f"Expected numpy array with shape (2,) or (1,2), got shape {arr.shape}")
+        elif isinstance(a, (float, int)) and isinstance(b, (float, int)):
+            self._a = float(a)
+            self._b = float(b)
+        else:
+            raise TypeError(f"{self.__class__.__name__} requires two floats or a numpy array of shape (2,)")
+
+        self._name_a = name_a
+        self._name_b = name_b
+
+    @property
+    def point(self) -> np.ndarray:
+        return np.array([self._a, self._b])
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._name_a}={self._a}, {self._name_b}={self._b})"
+
+
+
+class CartesianMessage(TwoFloatMessage):
+    def __init__(self, x: Union[float, np.ndarray], y: float = None):
+        super().__init__(x, y, name_a="x", name_b="y")
+
+    @property
+    def x(self):
+        return self._a
+
+    @property
+    def y(self):
+        return self._b
+    
+class JointTorqueMessage(TwoFloatMessage):
+    def __init__(self, t1: Union[float, np.ndarray], t2: float = None):
+        super().__init__(t1, t2, name_a="t1", name_b="t2")
+
+    @property
+    def torques(self):
+        return self.point

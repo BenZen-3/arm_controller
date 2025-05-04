@@ -1,11 +1,11 @@
 import argparse
 import time
-
+from pathlib import Path
 
 from .core.message_bus import MessageBus
-from .core.subscriber import Subscriber
-from .core.publisher import Publisher
-from .core.message_types import Message, NumberMessage, ListMessage, StringMessage
+# from .core.subscriber import Subscriber
+# from .core.publisher import Publisher
+from .core.message_types import PathMessage
 from .simulation.sim_manager import SimManager
 
 """
@@ -49,30 +49,20 @@ def main():
 
 def set_public_states(bus: MessageBus):
     """publish the core most common public topics"""
-    
-    # set state for data save directory
-    msg = StringMessage("INSERT DATA DIRECTORY HERE")
-    bus.set_state("common/data_directory", msg)
 
-    # set state for model save directory
-    msg = StringMessage("INSERT MODEL DIRECTORY HERE")
-    bus.set_state("common/model_directory", msg)
+    top_level = Path(__file__).resolve().parent.parent.parent # jank
+    sim_data_path = top_level / "data" / "sim_data"
+    model_data_path = top_level / "data" / "model_data"
+
+    # set state for save directories
+    bus.set_state("common/data_directory", PathMessage(sim_data_path))
+    bus.set_state("common/model_directory", PathMessage(model_data_path))
 
 
 def generate_data(bus: MessageBus):
 
     manager = SimManager(bus, 1, 10)
-    # manager.run_single_simulation()
-    manager.batch_process()
-
-    
-
-    # create message bus
-    # create simulation node
-    # create data synthesis node
-    # connect them to the bus
-    # save the data
-    pass
+    manager.run_single_simulation(0, 10, 100)
 
 def train_model():
     
