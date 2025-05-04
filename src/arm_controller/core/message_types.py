@@ -92,7 +92,7 @@ class JointTorqueMessage(Message):
     def torques(self):
         return np.array([self._t1, self._t2])
 
-class SimTimerMessage(Message):
+class TimingMessage(Message):
     def __init__(self, current_time: float, dt: float):
         """class for joint torques"""
         self._current_time = current_time
@@ -107,7 +107,7 @@ class SimTimerMessage(Message):
         return self._dt
 
     def __repr__(self):
-        return f"SimTimerMessage: Current Time: {self.current_time}, dt: {self.dt}"
+        return f"TimingMessage: Current Time: {self.current_time}, dt: {self.dt}"
     
 # class JointStateMessage(Message):
 #     def __init__(self, theta_1: float, theta_2: float):

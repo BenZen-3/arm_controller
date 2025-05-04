@@ -8,6 +8,14 @@ from .core.publisher import Publisher
 from .core.message_types import Message, NumberMessage, ListMessage, StringMessage
 from .simulation.sim_manager import SimManager
 
+"""
+todo:
+    message bus needs to be simulation-based. If there is a single message bus with multiprocess it will get ugly I think
+
+
+"""
+
+
 def main():
     """
     main program start
@@ -24,10 +32,10 @@ def main():
     args = parser.parse_args()
     start = time.time()
     bus = MessageBus()
-    publish_public_topics(bus)
+    set_public_states(bus)
 
     if args.mode == 'generator':
-        generate_data()
+        generate_data(bus)
     elif args.mode == 'trainer':
         train_model()
     elif args.mode == 'inference':
@@ -39,24 +47,23 @@ def main():
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
-def publish_public_topics(bus: MessageBus):
+def set_public_states(bus: MessageBus):
     """publish the core most common public topics"""
     
-    # publsih data save directory
-    data_save_dir_pub = Publisher(bus, "data_save_dir")
+    # set state for data save directory
     msg = StringMessage("INSERT DATA DIRECTORY HERE")
-    data_save_dir_pub.publish(msg)
+    bus.set_state("common/data_directory", msg)
 
-    # publish model save directory
-    model_save_dir_pub = Publisher(bus, "model_save_dir")
+    # set state for model save directory
     msg = StringMessage("INSERT MODEL DIRECTORY HERE")
-    model_save_dir_pub.publish(msg)
+    bus.set_state("common/model_directory", msg)
 
 
-def generate_data():
+def generate_data(bus: MessageBus):
 
-    manager = SimManager()
-    manager.generate_data()
+    manager = SimManager(bus, 1, 10)
+    # manager.run_single_simulation()
+    manager.batch_process()
 
     
 

@@ -1,5 +1,6 @@
 from collections import defaultdict
 from typing import Callable, Dict, List, Any, Optional
+from copy import deepcopy
 
 from .message_types import Message
 
@@ -25,3 +26,8 @@ class MessageBus:
     def get_state(self, topic: str) -> Optional[Message]:
         return self._state_store.get(topic, None)
 
+    def branch_bus(self) -> "MessageBus":
+        """Returns a new MessageBus with a copy of the current state but no subscribers."""
+        new_bus = MessageBus()
+        new_bus._state_store = deepcopy(self._state_store)
+        return new_bus

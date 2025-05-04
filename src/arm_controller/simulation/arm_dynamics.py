@@ -4,7 +4,7 @@ from dataclasses import dataclass, asdict
 from arm_controller.core.message_bus import MessageBus
 from arm_controller.core.subscriber import Subscriber
 from arm_controller.core.publisher import Publisher
-from arm_controller.core.message_types import ArmStateMessage, JointTorqueMessage
+from arm_controller.core.message_types import ArmStateMessage, TimingMessage
 
 @dataclass
 class ArmState:
@@ -23,8 +23,8 @@ class Arm:
         
         self.bus = message_bus
 
-        # arm is subscribed to joint torques. When controller gives torque, arm updates
-        self.bus.subscribe("controller/joint_torques", self.state_update)
+        # arm is subscribed to dynamics update tick. Runs with sim says to
+        self.bus.subscribe("sim/dynamics_update", self.state_update)
 
         # params, not modified 
         self.l_1 = l_1
@@ -92,15 +92,18 @@ class Arm:
         return np.array([theta_1_dot, theta_2_dot, q_dd[0], q_dd[1]])
 
     # def state_update(self, dt=None, U=np.array([[0], [0]])): # not even sure if U shape is correct? 
-    def state_update(self, msg: JointTorqueMessage):
+    def state_update(self, msg: TimingMessage):
         """
         Update the state given some dt and control vecotr U
         """
 
-        dt = _
-        U = msg.torques
+        # get the control torques
+        U = self.bus.get_state("controller/controller_torque_state")
+        if U is None:
+            U = np.zeros(2)
 
-        
+        dt = msg.dt
+
         # RK4 Integration
         state = np.array([self.state.theta_1, self.state.theta_2, self.state.theta_1_dot, self.state.theta_2_dot])
         
