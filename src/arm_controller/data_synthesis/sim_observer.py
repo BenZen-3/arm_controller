@@ -3,7 +3,7 @@ import pickle
 
 from arm_controller.core.message_bus import MessageBus
 from arm_controller.core.message_types import TimingMessage
-from arm_controller.visualization.arm_plotter import ArmVisualizer
+from arm_controller.visualization.arm_visualizer import ArmVisualizer
 
 class Observer(ABC):
 
@@ -20,8 +20,9 @@ class Observer(ABC):
             msg = self.bus.get_state("sim/sim_state")
             self.frequency = msg.frequency
 
-        # grab the arm_description for later use if needed
+        # get some useful states
         self.arm_description = self.bus.get_state("arm/description")
+        self.freq = self.bus.get_state("sim/sim_state").frequency
     
     @abstractmethod
     def obsesrve_state(self, msg: TimingMessage):
@@ -54,12 +55,8 @@ class JointStateObserver(Observer):
         self.history.append(state)
 
     def visualize(self):
-        """visualize the history"""
-
-        # assume visualization freq is the same as the simulation freq
+        """visualize the arm's state history"""
 
         l_1, l_2 = self.arm_description.l_1, self.arm_description.l_2
-
-        plotter = ArmVisualizer(l_1, l_2)
-        for state in self.history:
-            plotter.plot_state(state)
+        visualizer = ArmVisualizer(self.history, playback_speed=.5, l_1=l_1, l_2=l_2, sim_rate_hz=self.freq)
+        visualizer.play()

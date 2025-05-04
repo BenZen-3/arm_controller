@@ -8,8 +8,7 @@ from .simulation.sim_manager import SimManager
 
 """
 todo:
-    message bus needs to be simulation-based. If there is a single message bus with multiprocess it will get ugly I think (DONE)
-
+    different frequencies for arm controller, observer and master simulation
 
 """
 
@@ -76,7 +75,7 @@ def model_inference(bus: MessageBus):
 def visualize(bus: MessageBus):
 
     manager = SimManager(bus, 10, 100, save_sim=False)
-    observer = manager.run_single_simulation(0, 100, 10)
+    observer = manager.run_single_simulation(0, 100)
     observer.visualize()
 
 

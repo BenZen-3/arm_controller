@@ -88,7 +88,7 @@ class Simulation:
 
         num_ticks = self.total_time * self.sim_frequency
         dt = 1/self.sim_frequency
-        self.set_sim_state_running(True)
+        self._set_sim_state_running(True)
 
         # these things can be at different frequenies than the actual simulation, update this later 
         goal_update = True
@@ -109,9 +109,9 @@ class Simulation:
             if self.observer and observer_update:
                 self.observer_update_publsiher.publish(TimingMessage(current_time, dt))
 
-        self.set_sim_state_running(False)
+        self._set_sim_state_running(False)
 
-    def set_sim_state_running(self, running:bool):
+    def _set_sim_state_running(self, running:bool):
 
         # update state message
         current_state = self.bus.get_state("sim/sim_state")
