@@ -1,10 +1,8 @@
-import numpy as np
 from dataclasses import dataclass, asdict
+import numpy as np
 
 from arm_controller.core.message_bus import MessageBus
-from arm_controller.core.subscriber import Subscriber
-from arm_controller.core.publisher import Publisher
-from arm_controller.core.message_types import ArmStateMessage, TimingMessage
+from arm_controller.core.message_types import ArmStateMessage, TimingMessage, ArmDescriptionMessage
 
 @dataclass
 class ArmState:
@@ -22,16 +20,15 @@ class Arm:
     def __init__(self, message_bus: MessageBus, x_0=0, y_0=0, theta_1=0, theta_2=0, l_1=1, l_2=1, m_1=1, m_2=1, g=9.8):
         
         self.bus = message_bus
-
-        # arm is subscribed to dynamics update tick. Runs with sim says to
-        self.bus.subscribe("sim/dynamics_update", self.state_update)
-
-        # params, not modified 
         self.l_1 = l_1
         self.l_2 = l_2
         self.m_1 = m_1
         self.m_2 = m_2
         self.g = g
+
+        # arm is subscribed to dynamics update tick. Runs with sim says to
+        self.bus.subscribe("sim/dynamics_update", self.state_update)
+        self.bus.set_state("arm/description", ArmDescriptionMessage(l_1, l_2, m_1, m_2, g))
 
         # carry the state in a separate instance for clarity between params and state vars
         self.state = ArmState(x_0, y_0, theta_1, theta_2)

@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from arm_controller.core.message_bus import MessageBus
-from arm_controller.core.publisher import Publisher
 from arm_controller.core.message_types import JointTorqueMessage, TimingMessage, ArmStateMessage, Message
 
 
@@ -17,7 +16,6 @@ class Controller(ABC):
         # set frequency
         if frequency is None:
             msg = self.bus.get_state("sim/sim_state")
-            print(msg)
             self.frequency = msg.frequency
 
     def controller_update(self, msg: TimingMessage):

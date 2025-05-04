@@ -1,21 +1,19 @@
-from arm_controller.core.message_bus import MessageBus
-from arm_controller.core.subscriber import Subscriber
-from arm_controller.core.publisher import Publisher
-from arm_controller.core.message_types import NumberMessage, SimStateMessage, TimingMessage, CartesianMessage
+import multiprocessing as mp
+import numpy as np
 
+from arm_controller.core.message_bus import MessageBus
+from arm_controller.core.publisher import Publisher
+from arm_controller.core.message_types import SimStateMessage, TimingMessage, CartesianMessage
 from arm_controller.simulation.arm_dynamics import Arm
 from arm_controller.simulation.arm_controller import Controller, NoController
 from arm_controller.data_synthesis.sim_observer import JointStateObserver, Observer
 
-
-import numpy as np
-import multiprocessing as mp
-
-
 class SimManager:
     """Class for managing multiple simulations"""
 
-    def __init__(self, bus: MessageBus, num_sims: int, total_time: float):
+    DEFAULT_FREQUENCY = 100
+
+    def __init__(self, bus: MessageBus, num_sims: int, total_time: float, save_sim: bool=True):
         """
         Initialize the SimManager.
         
@@ -27,49 +25,39 @@ class SimManager:
         self.bus = bus
         self.num_sims = num_sims
         self.total_time = total_time
-        self.frequency = 100
+        self.save_sim = save_sim
 
-    def run_single_simulation(self, sim_id, total_time, frequency):
+    def run_single_simulation(self, sim_id: int, total_time: float, frequency: int=None):
+
+        if frequency is None:
+            frequency = self.DEFAULT_FREQUENCY
 
         # branch the global bus to keep all messages on the global bus
         sim_bus = self.bus.branch_bus()
         sim_bus.set_state("sim/sim_state", SimStateMessage(sim_id, frequency, total_time, False))
         
-        # should load the params from something like a yaml instead
+        # should load the params from something like a yaml instead. The order that these are created matters... sorta jank but ehhh
         arm = Arm(sim_bus)
         controller = NoController(sim_bus)
-        recorder = JointStateObserver(sim_bus)
+        observer = JointStateObserver(sim_bus)
 
         # run the sim
-        sim = Simulation(sim_bus, total_time, frequency, arm, controller, recorder)
+        sim = Simulation(sim_bus, total_time, frequency, arm, controller, observer)
         sim.run()
 
         # save data
-        recorder.save()
-
-
+        if self.save_sim:
+            observer.save()
+        
+        return observer
 
     def batch_process(self):
-        """
-        Run all simulations in parallel and collect the results.
-        
-        Returns:
-        - A dictionary of {simulation_id: recording}.
-        """
+        """Run all simulations in parallel and collect the results."""
 
-        results = {}
         # use all but one cpu because I enjoy using my computer
         with mp.Pool(processes=mp.cpu_count() - 1) as pool:
-            # Prepare simulation arguments
-            tasks = [
-                (sim_id, self.total_time, self.frequency) 
-                for sim_id in range(self.num_sims)
-            ]
-            # Run simulations in parallel
-            for sim_id, recording in pool.starmap(self.run_single_simulation, tasks):
-                results[sim_id] = recording
-
-        return results
+            tasks = [(sim_id, self.total_time) for sim_id in range(self.num_sims)] # Prepare simulation arguments
+            pool.starmap(self.run_single_simulation, tasks) # Run simulations in parallel
 
 
 class Simulation:
@@ -123,7 +111,7 @@ class Simulation:
 
         self.set_sim_state_running(False)
 
-    def set_sim_state_running(self, running):
+    def set_sim_state_running(self, running:bool):
 
         # update state message
         current_state = self.bus.get_state("sim/sim_state")

@@ -3,14 +3,12 @@ import time
 from pathlib import Path
 
 from .core.message_bus import MessageBus
-# from .core.subscriber import Subscriber
-# from .core.publisher import Publisher
 from .core.message_types import PathMessage
 from .simulation.sim_manager import SimManager
 
 """
 todo:
-    message bus needs to be simulation-based. If there is a single message bus with multiprocess it will get ugly I think
+    message bus needs to be simulation-based. If there is a single message bus with multiprocess it will get ugly I think (DONE)
 
 
 """
@@ -24,7 +22,7 @@ def main():
     parser = argparse.ArgumentParser(description="Arm controller Package")
     parser.add_argument(
         '--mode', 
-        choices=['generator', 'trainer', 'inference', 'playback', "testing"], 
+        choices=['generator', 'trainer', 'inference', 'visualize', "testing"], 
         default='generator',
         help='Choose which module to run. Generate data, train on data, or predict a sequence from a random starting state'
     )
@@ -37,20 +35,20 @@ def main():
     if args.mode == 'generator':
         generate_data(bus)
     elif args.mode == 'trainer':
-        train_model()
+        train_model(bus)
     elif args.mode == 'inference':
-        model_inference()
-    elif args.mode == 'playback':
-        playback()
+        model_inference(bus)
+    elif args.mode == 'visualize':
+        visualize(bus)
     elif args.mode == 'testing':
-        testing()
+        testing(bus)
 
     print(f"Total time: {round(time.time() - start, 2)} seconds")
 
 def set_public_states(bus: MessageBus):
     """publish the core most common public topics"""
 
-    top_level = Path(__file__).resolve().parent.parent.parent # jank
+    top_level = Path(__file__).resolve().parents[2]
     sim_data_path = top_level / "data" / "sim_data"
     model_data_path = top_level / "data" / "model_data"
 
@@ -58,29 +56,31 @@ def set_public_states(bus: MessageBus):
     bus.set_state("common/data_directory", PathMessage(sim_data_path))
     bus.set_state("common/model_directory", PathMessage(model_data_path))
 
-
 def generate_data(bus: MessageBus):
+    """generate and save data"""
 
-    manager = SimManager(bus, 1, 10)
-    manager.run_single_simulation(0, 10, 100)
+    manager = SimManager(bus, 10, 100)
+    manager.batch_process()
 
-def train_model():
+def train_model(bus: MessageBus):
     
     # use train.py
     pass
 
-def model_inference():
+def model_inference(bus: MessageBus):
 
     # use model.py to run at inference time
     # use visualization
     pass
 
-def playback():
+def visualize(bus: MessageBus):
 
-    # use visualization tools to playback a recording
-    pass
+    manager = SimManager(bus, 10, 100, save_sim=False)
+    observer = manager.run_single_simulation(0, 100, 10)
+    observer.visualize()
 
-def testing():
+
+def testing(bus: MessageBus):
 
     # testing stuff
     pass

@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Callable, Dict, List, Any, Optional
+from typing import Callable, Dict, List, Optional
 from copy import deepcopy
 
 from .message_types import Message
@@ -31,3 +31,15 @@ class MessageBus:
         new_bus = MessageBus()
         new_bus._state_store = deepcopy(self._state_store)
         return new_bus
+
+    def list_topics(self) -> List[str]:
+        """
+        Returns a list of all topics that currently have subscribers.
+        """
+        return list(self.subscribers.keys())
+
+    def list_states(self) -> List[str]:
+        """
+        Returns a list of all topics that have stored state (via set_state).
+        """
+        return list(self._state_store.keys())

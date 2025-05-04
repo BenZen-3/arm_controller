@@ -128,41 +128,6 @@ class JointTorqueMessage(Message):
     def __repr__(self) -> str:
         return f"TorqueMessage(t1={self._t1}, t2={self._t2})"
 
-
-# @dataclass(frozen=True)
-# class CartesianMessage(Message):
-#     x: float
-#     y: float
-
-#     def __repr__(self):
-#         return f"CartesianMessage(x={self.x}, y={self.y})"
-
-# @dataclass
-# class CartesianMessage(Message):
-#     x: float = 0.0
-#     y: float = 0.0
-
-#     def __init__(self, x: Union[float, np.ndarray], y: float = None):
-#         if isinstance(x, np.ndarray):
-#             arr = np.squeeze(x)
-#             if arr.shape == (2,):
-#                 self.x = float(arr[0])
-#                 self.y = float(arr[1])
-#             else:
-#                 raise ValueError(f"Expected numpy array with shape (2,) or (1,2), got shape {arr.shape}")
-#         elif isinstance(x, (float, int)) and isinstance(y, (float, int)):
-#             self.x = float(x)
-#             self.y = float(y)
-#         else:
-#             raise TypeError("CartesianMessage requires either two floats or a numpy array of shape (2,)")
-
-#     @property
-#     def point(self) -> np.ndarray:
-#         return np.array([self.x, self.y])
-
-#     def __repr__(self):
-#         return f"CartesianMessage(x={self.x}, y={self.y})"
-
 class TwoFloatMessage(Message, ABC):
     def __init__(self, a: Union[float, np.ndarray], b: float = None, name_a="a", name_b="b"):
         if isinstance(a, np.ndarray):
@@ -209,3 +174,15 @@ class JointTorqueMessage(TwoFloatMessage):
     @property
     def torques(self):
         return self.point
+    
+@dataclass(frozen=True)
+class ArmDescriptionMessage(Message):
+    """A message for the description of the 2dof arm"""
+    l_1: float
+    l_2: float
+    m_1: float
+    m_2: float
+    g: float
+
+    def __repr__(self):
+        return f"ArmDescriptionMessage(l1={self.l_1}, l2={self.l_2}, m1={self.m_1}, m2={self.m_2}, g={self.g})"

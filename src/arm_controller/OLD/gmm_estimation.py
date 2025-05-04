@@ -998,22 +998,6 @@ class ArmFitter:
         return combined
 
 
-# everything past here is like testing and shit
-
-class DAWG:
-
-    def __init__(self):
-        pass
-
-    def whosagoodboy(self):
-        return "WOOF"
-    
-    def whoslosingtheirmind(self):
-        return "ME"
-
-
-
-
 def main_2d():
     # Make distributions
     mesh_grid = ProbabilityDistribution.create_mesh_grid(grid_size=50, plot_range=(-5, 5))  # Reduced grid size
