@@ -45,6 +45,7 @@ class Observer(ABC):
             pickle.dump(self, file)
 
 class JointStateObserver(Observer):
+    """just observes and records joint states"""
     def __init__(self, message_bus):
         super().__init__(message_bus)
         self.history = []
@@ -60,3 +61,17 @@ class JointStateObserver(Observer):
         l_1, l_2 = self.arm_description.l_1, self.arm_description.l_2
         visualizer = ArmVisualizer(self.history, playback_speed=.5, l_1=l_1, l_2=l_2, sim_rate_hz=self.freq)
         visualizer.play()
+
+class GMMObserver(Observer):
+    """observes simulation and records the GMM equivalent"""
+
+    def __init__(self, bus: MessageBus):
+        super().__init__(bus)
+        self.history = []
+
+    def obsesrve_state(self, msg: TimingMessage):
+        
+        state = self.bus.get_state("arm/arm_state")
+        self.history.append(state)
+
+        # ESTIMATE THE ARM WITH A GMM
