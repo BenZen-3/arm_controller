@@ -4,6 +4,7 @@ from matplotlib.animation import FuncAnimation
 
 # TODO: add type hinting to this vibe coded POS
 # TODO: add reasonable docstrings 
+# TODO: sim_rate_hz is actually data_collection_hz
 
 class ArmVisualizer:
 
@@ -27,8 +28,8 @@ class ArmVisualizer:
         self.fig, self.ax = plt.subplots()
         plt.title(f"Arm: {r'$l_{1}$'}={l_1}, {r'$l_{2}$'}={l_2}. Simulated at {sim_rate_hz}hz. Speed: {playback_speed}")
         self.line, = self.ax.plot([], [], 'o-', lw=4, color='blue')
-        self.ax.set_xlim(- (l_1 + l_2), l_1 + l_2)
-        self.ax.set_ylim(- (l_1 + l_2), l_1 + l_2)
+        self.ax.set_xlim(- (l_1 + l_2)*1.1, (l_1 + l_2)*1.1)
+        self.ax.set_ylim(- (l_1 + l_2)*1.1, (l_1 + l_2)*1.1)
         self.ax.set_aspect('equal')
         self.ax.grid(True)
 

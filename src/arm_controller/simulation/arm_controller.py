@@ -35,8 +35,8 @@ class Controller(ABC):
 class NoController(Controller):
     """A dummy controller that outputs zero torque."""
 
-    def __init__(self, message_bus):
-        super().__init__(message_bus)
+    def __init__(self, message_bus: MessageBus, frequency: int=None):
+        super().__init__(message_bus, frequency)
 
     def compute_torque(self, arm_state_msg: ArmStateMessage, goal_msg: Message) -> np.ndarray:
         return np.zeros(2)

@@ -4,9 +4,10 @@ from sklearn.mixture import GaussianMixture
 from sklearn.utils import check_random_state
 from abc import ABC, abstractmethod
 import numpy as np
+from typing import List
 
 from arm_controller.data_synthesis.probability import ProbabilityDistribution, SDFRectangle, GaussianMixtureDistribution, CombinedDistribution
-
+from arm_controller.core.message_types import ArmDescriptionMessage, ArmStateMessage
 
 
 class GaussianFitter:
@@ -14,7 +15,7 @@ class GaussianFitter:
     A class for fitting Gaussian Mixture Models to probability distributions.
     """
     
-    def __init__(self, n_components=10, max_iter=100):
+    def __init__(self, n_components: int=10, max_iter: int=100):
         """
         Initialize a GaussianFitter.
         
@@ -203,15 +204,16 @@ class GaussianFitter:
 
 class ArmFitter:
 
-    def __init__(self, arm, n_gaussians=4, gaussian_dropoff=4.0):
+    def __init__(self, arm_description: ArmDescriptionMessage, n_gaussians: int=4, gaussian_dropoff: float=4.0):
 
-        self._arm_ref = arm
+        self.arm_description = arm_description
+        self.n_gaussians = n_gaussians
         self.dropoff = gaussian_dropoff
 
         self.mesh_grid = ProbabilityDistribution.create_mesh_grid(grid_size=64, plot_range=(0, 4.2))  # Reduced grid size
         self.fitter = GaussianFitter(n_components=n_gaussians)
 
-    def fit_arm(self, n_samples=500):
+    def fit_arm(self, arm_state: ArmStateMessage, n_samples: int=500) -> List:
         """
         fits the arm's sdf probability distribution to a gaussian mixture model. 
         
@@ -219,31 +221,36 @@ class ArmFitter:
         """
         
         # create a combined distribution and fit it with gaussians
-        combined_dist = self.arm_sdf()
+        combined_dist = self.arm_sdf(arm_state)
         gmm_dist = self.fitter.fit(combined_dist, n_samples=n_samples)
         params = gmm_dist.get_gaussian_params()
 
         return params
 
-    def arm_sdf(self):
+    def arm_sdf(self, arm_state: ArmStateMessage):
         """
         get that SDF baby!
         """
 
-        arm = self._arm_ref
-        width_1, width_2 = arm.l1, arm.l2
+        l_1, l_2 = self.arm_description.l_1, self.arm_description.l_2
+        x_0 = arm_state.x_0
+        y_0 = arm_state.y_0
+        theta_1 = arm_state.theta_1
+        theta_2 = arm_state.theta_2
+
+        width_1, width_2 = l_1, l_2
         height = .05
 
         # rectangle numero uno
-        x1 = arm.state.x0 - arm.l1/2 * np.cos(arm.state.theta1)
-        y1 = arm.state.y0 + arm.l1/2 * np.sin(arm.state.theta1)
-        angle = arm.state.theta1
+        x1 = x_0 - l_1/2 * np.cos(theta_1)
+        y1 = y_0 + l_1/2 * np.sin(theta_1)
+        angle = theta_1
         lower_arm = SDFRectangle(x1, y1, width_1, height, angle, mesh_grid=self.mesh_grid, dropoff=self.dropoff)
 
         # rectangle numero dos
-        x2 =  arm.state.x0 - arm.l1 * np.cos(arm.state.theta1) - arm.l2/2 * np.cos(arm.state.theta1 + arm.state.theta2)
-        y2 = arm.state.y0 + arm.l1 * np.sin(arm.state.theta1) + arm.l2/2 * np.sin(arm.state.theta1 + arm.state.theta2)
-        angle = arm.state.theta1 + arm.state.theta2
+        x2 =  x_0 - l_1 * np.cos(theta_1) - l_2/2 * np.cos(theta_1 + theta_2)
+        y2 = y_0 + l_1 * np.sin(theta_1) + l_2/2 * np.sin(theta_1 + theta_2)
+        angle = theta_1 + theta_2
         upper_arm = SDFRectangle(x2, y2, width_2, height, angle, mesh_grid=self.mesh_grid, dropoff=self.dropoff)
 
         combined = CombinedDistribution(distributions=[lower_arm, upper_arm], mesh_grid=self.mesh_grid, method='max')

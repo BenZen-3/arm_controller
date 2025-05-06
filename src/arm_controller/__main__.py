@@ -75,7 +75,7 @@ def model_inference(bus: MessageBus):
 def visualize(bus: MessageBus):
 
     manager = SimManager(bus, 10, 100, save_sim=False)
-    observer = manager.run_single_simulation(0, 100)
+    observer = manager.run_single_simulation(0, 10)
     observer.visualize()
 
 

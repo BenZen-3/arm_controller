@@ -1,12 +1,13 @@
 import multiprocessing as mp
 import numpy as np
+from typing import List
 
 from arm_controller.core.message_bus import MessageBus
 from arm_controller.core.publisher import Publisher
 from arm_controller.core.message_types import SimStateMessage, TimingMessage, CartesianMessage
 from arm_controller.simulation.arm_dynamics import Arm
 from arm_controller.simulation.arm_controller import Controller, NoController
-from arm_controller.data_synthesis.sim_observer import JointStateObserver, Observer
+from arm_controller.data_synthesis.sim_observer import JointStateObserver, Observer, GMMObserver
 
 class SimManager:
     """Class for managing multiple simulations"""
@@ -39,7 +40,8 @@ class SimManager:
         # should load the params from something like a yaml instead. The order that these are created matters... sorta jank but ehhh
         arm = Arm(sim_bus)
         controller = NoController(sim_bus)
-        observer = JointStateObserver(sim_bus)
+        # observer = JointStateObserver(sim_bus)
+        observer = GMMObserver(sim_bus, 10)
 
         # run the sim
         sim = Simulation(sim_bus, total_time, frequency, arm, controller, observer)
@@ -90,28 +92,37 @@ class Simulation:
         dt = 1/self.sim_frequency
         self._set_sim_state_running(True)
 
-        # these things can be at different frequenies than the actual simulation, update this later 
-        goal_update = True
-        controller_update = True
-        observer_update = True
+        # different frequencies means different ticks trigger each component
+        goal_update_ticks = set(self.ticks_to_run_at_freq(self.observer.frequency))
+        controller_update_ticks = set(self.ticks_to_run_at_freq(self.observer.frequency))
+        observer_update_ticks = set(self.ticks_to_run_at_freq(self.observer.frequency))
 
         for n_tick in range(num_ticks):
             current_time = n_tick * self.sim_frequency
 
             self.dynamics_update_publisher.publish(TimingMessage(current_time, dt))
 
-            if goal_update:
+            if n_tick in goal_update_ticks:
                 self.bus.set_state("sim/goal_state", CartesianMessage(np.zeros(2)))
 
-            if controller_update:
+            if n_tick in controller_update_ticks:
                 self.controller_update_publisher.publish(TimingMessage(current_time, dt))
 
-            if self.observer and observer_update:
+            if n_tick in observer_update_ticks:
                 self.observer_update_publsiher.publish(TimingMessage(current_time, dt))
 
         self._set_sim_state_running(False)
 
-    def _set_sim_state_running(self, running:bool):
+    def ticks_to_run_at_freq(self, sample_freq: int) -> List[int]:
+        """gives ticks to run at given freq"""
+
+        assert(sample_freq < self.sim_frequency), f"cannot sample at higher freq than sim runs at. sample: {sample_freq}, sim: {self.sim_frequency}"
+            
+        num_ticks = self.total_time * self.sim_frequency
+        num_sample_ticks = sample_freq * self.total_time
+        return np.linspace(0, num_ticks-1, num_sample_ticks).astype(int)
+
+    def _set_sim_state_running(self, running: bool):
 
         # update state message
         current_state = self.bus.get_state("sim/sim_state")

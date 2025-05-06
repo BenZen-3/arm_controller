@@ -4,25 +4,27 @@ import pickle
 from arm_controller.core.message_bus import MessageBus
 from arm_controller.core.message_types import TimingMessage
 from arm_controller.visualization.arm_visualizer import ArmVisualizer
+from arm_controller.data_synthesis.gmm_estimator import ArmFitter
 
 class Observer(ABC):
 
     GENERIC_NAME = "simulation"
 
     """collects all relevant state info and does *things* with it"""
-    def __init__(self, bus: MessageBus, frequency: float = None):
+    def __init__(self, bus: MessageBus, frequency: int = None):
         
         self.bus = bus
+        self.frequency = frequency
         self.bus.subscribe("sim/observer_update", self.obsesrve_state)
 
         # set frequency
-        if frequency is None:
+        if self.frequency is None:
             msg = self.bus.get_state("sim/sim_state")
             self.frequency = msg.frequency
 
         # get some useful states
         self.arm_description = self.bus.get_state("arm/description")
-        self.freq = self.bus.get_state("sim/sim_state").frequency
+        self.sim_freq = self.bus.get_state("sim/sim_state").frequency
     
     @abstractmethod
     def obsesrve_state(self, msg: TimingMessage):
@@ -46,8 +48,8 @@ class Observer(ABC):
 
 class JointStateObserver(Observer):
     """just observes and records joint states"""
-    def __init__(self, message_bus):
-        super().__init__(message_bus)
+    def __init__(self, bus: MessageBus, frequency: int=None):
+        super().__init__(bus, frequency)
         self.history = []
 
     def obsesrve_state(self, msg: TimingMessage):
@@ -59,19 +61,32 @@ class JointStateObserver(Observer):
         """visualize the arm's state history"""
 
         l_1, l_2 = self.arm_description.l_1, self.arm_description.l_2
-        visualizer = ArmVisualizer(self.history, playback_speed=.5, l_1=l_1, l_2=l_2, sim_rate_hz=self.freq)
+        visualizer = ArmVisualizer(self.history, playback_speed=1, l_1=l_1, l_2=l_2, sim_rate_hz=self.frequency)
         visualizer.play()
 
 class GMMObserver(Observer):
     """observes simulation and records the GMM equivalent"""
 
-    def __init__(self, bus: MessageBus):
-        super().__init__(bus)
+    def __init__(self, bus: MessageBus, frequency: int=None, num_gaussians: int=4):
+        super().__init__(bus, frequency)
+        self.num_gaussians = num_gaussians
         self.history = []
+        self.gmm_estimate_history = []
+
+        self.arm_fitter = ArmFitter(self.arm_description)
 
     def obsesrve_state(self, msg: TimingMessage):
         
         state = self.bus.get_state("arm/arm_state")
         self.history.append(state)
 
-        # ESTIMATE THE ARM WITH A GMM
+        gmm_params = self.arm_fitter.fit_arm(state)
+        self.gmm_estimate_history.append(gmm_params)
+
+        # print(gmm_params)
+
+    def visualize(self):
+
+        l_1, l_2 = self.arm_description.l_1, self.arm_description.l_2
+        visualizer = ArmVisualizer(self.history, playback_speed=1, l_1=l_1, l_2=l_2, sim_rate_hz=self.frequency)
+        visualizer.play()
