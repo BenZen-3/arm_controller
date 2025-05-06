@@ -1,35 +1,37 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from typing import List
+
+from arm_controller.core.message_types import ArmStateMessage
 
 # TODO: add type hinting to this vibe coded POS
 # TODO: add reasonable docstrings 
-# TODO: sim_rate_hz is actually data_collection_hz
 
 class ArmVisualizer:
 
     DEFAULT_PLAYBACK_HZ = 30
 
-    def __init__(self, arm_states, playback_speed=1.0, l_1=1.0, l_2=1.0, sim_rate_hz=100):
+    def __init__(self, arm_states: List[ArmStateMessage], playback_speed: float=1.0, l_1: float=1.0, l_2: float=1.0, data_collection_hz: int=100):
         """
         arm_states: list of ArmStateMessage
-        sim_rate_hz: original simulation frequency
+        data_collection_hz: original frequency of data collection
         playback_rate_hz: desired visualization playback frequency
         playback_speed: multiplier for playback speed (1.0 = normal, 2.0 = 2x speed, etc.)
         """
         self.playback_speed = playback_speed
         self.l_1 = l_1
         self.l_2 = l_2
-        self.sim_rate_hz = sim_rate_hz
+        self.data_collection_hz = data_collection_hz
         self.interval_ms = (1000 / self.DEFAULT_PLAYBACK_HZ) / self.playback_speed  # ms/frame adjusted for playback speed
-        self.states = self._downsample(arm_states, sim_rate_hz, self.DEFAULT_PLAYBACK_HZ)
+        self.states = self._downsample(arm_states, data_collection_hz, self.DEFAULT_PLAYBACK_HZ)
 
         plt.style.use('dark_background')
         self.fig, self.ax = plt.subplots()
-        plt.title(f"Arm: {r'$l_{1}$'}={l_1}, {r'$l_{2}$'}={l_2}. Simulated at {sim_rate_hz}hz. Speed: {playback_speed}")
+        plt.title(f"Arm: {r'$l_{1}$'}={l_1}, {r'$l_{2}$'}={l_2}. Simulated at {data_collection_hz}hz. Speed: {playback_speed}")
         self.line, = self.ax.plot([], [], 'o-', lw=4, color='blue')
-        self.ax.set_xlim(- (l_1 + l_2)*1.1, (l_1 + l_2)*1.1)
-        self.ax.set_ylim(- (l_1 + l_2)*1.1, (l_1 + l_2)*1.1)
+        self.ax.set_xlim(- (l_1 + l_2) + 0.1, (l_1 + l_2) + 0.1)
+        self.ax.set_ylim(- (l_1 + l_2) + 0.1, (l_1 + l_2) + 0.1)
         self.ax.set_aspect('equal')
         self.ax.grid(True)
 
@@ -44,6 +46,7 @@ class ArmVisualizer:
         return [states[i] for i in sample_times]
 
     def _update(self, frame):
+        """private update function for the animation"""
         state = self.states[frame]
         x_0, y_0 = state.x_0, state.y_0
         theta_1, theta_2 = state.theta_1, state.theta_2
@@ -58,6 +61,7 @@ class ArmVisualizer:
         return self.line,
 
     def play(self):
+        """function animation"""
         self.anim = FuncAnimation(
             self.fig,
             self._update,

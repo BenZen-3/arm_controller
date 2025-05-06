@@ -210,7 +210,7 @@ class ArmFitter:
         self.n_gaussians = n_gaussians
         self.dropoff = gaussian_dropoff
 
-        self.mesh_grid = ProbabilityDistribution.create_mesh_grid(grid_size=64, plot_range=(0, 4.2))  # Reduced grid size
+        self.mesh_grid = ProbabilityDistribution.create_mesh_grid(grid_size=64, plot_range=(-2.1, 2.1))  # Reduced grid size
         self.fitter = GaussianFitter(n_components=n_gaussians)
 
     def fit_arm(self, arm_state: ArmStateMessage, n_samples: int=500) -> List:

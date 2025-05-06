@@ -4,6 +4,7 @@ import pickle
 from arm_controller.core.message_bus import MessageBus
 from arm_controller.core.message_types import TimingMessage
 from arm_controller.visualization.arm_visualizer import ArmVisualizer
+from arm_controller.visualization.gmm_visualizer import GMMVisualizer
 from arm_controller.data_synthesis.gmm_estimator import ArmFitter
 
 class Observer(ABC):
@@ -64,6 +65,7 @@ class JointStateObserver(Observer):
         visualizer = ArmVisualizer(self.history, playback_speed=1, l_1=l_1, l_2=l_2, sim_rate_hz=self.frequency)
         visualizer.play()
 
+
 class GMMObserver(Observer):
     """observes simulation and records the GMM equivalent"""
 
@@ -83,10 +85,12 @@ class GMMObserver(Observer):
         gmm_params = self.arm_fitter.fit_arm(state)
         self.gmm_estimate_history.append(gmm_params)
 
-        # print(gmm_params)
-
     def visualize(self):
 
-        l_1, l_2 = self.arm_description.l_1, self.arm_description.l_2
-        visualizer = ArmVisualizer(self.history, playback_speed=1, l_1=l_1, l_2=l_2, sim_rate_hz=self.frequency)
+        # l_1, l_2 = self.arm_description.l_1, self.arm_description.l_2
+        # visualizer = ArmVisualizer(self.history, playback_speed=1, l_1=l_1, l_2=l_2, sim_rate_hz=self.frequency)
+        # visualizer.play()
+
+        # gmm_param_history: List of frames, each a list of 6-tuples
+        visualizer = GMMVisualizer(self.gmm_estimate_history, playback_speed=1.0, data_collection_hz=self.frequency)
         visualizer.play()
