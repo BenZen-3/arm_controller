@@ -102,15 +102,14 @@ class GMMObserver(Observer):
         visualizer.play()
 
 class DiffusionObserver(GMMObserver):
-    def __init__(self, bus: MessageBus, frequency: int=None, num_gaussians: int=4):
+    def __init__(self, bus: MessageBus, frequency: int=None, num_gaussians: int=4, n_diffusion_steps: int=20):
         super().__init__(bus, frequency, num_gaussians)
-
+        self.n_diffusion_steps = n_diffusion_steps
         self.bus.subscribe("sim/sim_running", self.after_sim)
-
 
     def after_sim(self, msg: BooleanMessage):
         
-        diffuser = Diffuser(self.gmm_estimate_history)
+        diffuser = Diffuser(self.gmm_estimate_history, n_diffusion_steps=self.n_diffusion_steps)
         self.history, self.noise = diffuser.forward_diffusion()
         
     def fuse_history(self, history):
@@ -129,5 +128,5 @@ class DiffusionObserver(GMMObserver):
     def visualize(self, playback_speed: float=1):
 
         fused_history = self.fuse_history(self.history)
-        visualizer = GMMVisualizer(fused_history, playback_speed=1.0, data_collection_hz=self.frequency)
+        visualizer = GMMVisualizer(fused_history, playback_speed=1, data_collection_hz=self.frequency)
         visualizer.play()

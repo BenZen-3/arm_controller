@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from typing import List, Tuple
+import time
 
 from arm_controller.data_synthesis.probability import GaussianMixtureDistribution
 from arm_controller.data_synthesis.probability import ProbabilityDistribution
@@ -39,16 +40,19 @@ class GMMVisualizer:
         self.heatmap = self.ax.pcolormesh(self.X, self.Y, self.gmm_field, cmap='plasma', shading='auto')
         self.scatter, = self.ax.plot([], [], 'ro', markersize=3)
 
+        # hacky pause stuff. looks better this way
+        self.nth_frame_pause = None
+        self.pause_duration = 0
+
     def _downsample(self, data, sim_rate, target_rate):
         num_input_frames = len(data)
         total_time = num_input_frames / sim_rate
         num_frames = int(total_time * target_rate)
         sample_times = np.linspace(0, num_input_frames - 1, num=num_frames).astype(int)
         return [data[i] for i in sample_times]
-
+    
     def _update(self, frame):
         gmm_params = self.gmm_param_history[frame]
-        print(gmm_params)
         gmm_dist = GaussianMixtureDistribution(gmm_params, mesh_grid=self.mesh_grid)
         prob = gmm_dist.get_probability()
 
@@ -73,23 +77,3 @@ class GMMVisualizer:
         )
         plt.tight_layout()
         plt.show()
-
-
-# class GMMDiffusionVisualizer(GMMVisualizer):
-#     def __init__(self, diffused_gmm_param_history, playback_speed = 1, data_collection_hz = 100, grid_size = 64, plot_range = (-2.1, 2.1)):
-
-#         gmm_param_history = self.fuse_history(diffused_gmm_param_history)
-#         super().__init__(gmm_param_history, playback_speed, data_collection_hz, grid_size, plot_range)
-
-#     def fuse_history(self, history):
-#         """
-#         Flattens history[time][diffusion_step][gaussian] -> history[time * diffusion_step][gaussian]
-#         Treats each diffusion step as a unique time step in the final sequence.
-#         """
-#         fused = []
-
-#         for time_step in history:
-#             for diffusion_step in time_step:
-#                 fused.append(diffusion_step)  # each is a list of Gaussians (tuples)
-
-#         return fused

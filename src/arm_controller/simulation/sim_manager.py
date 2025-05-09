@@ -42,8 +42,8 @@ class SimManager:
         arm = Arm(sim_bus, theta_1=theta_1, theta_2=theta_2)
         controller = NoController(sim_bus)
         # observer = JointStateObserver(sim_bus)
-        observer = GMMObserver(sim_bus, 8)
-        # observer = DiffusionObserver(sim_bus, 10)
+        # observer = GMMObserver(sim_bus, 8)
+        observer = DiffusionObserver(sim_bus, 10, n_diffusion_steps=40)
 
         # run the sim
         sim = Simulation(sim_bus, total_time, frequency, arm, controller, observer)

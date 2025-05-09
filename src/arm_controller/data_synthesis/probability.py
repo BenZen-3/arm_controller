@@ -362,10 +362,18 @@ class GaussianDistribution(ProbabilityDistribution):
                 [self.sigma_x**2, self.rho * self.sigma_x * self.sigma_y],
                 [self.rho * self.sigma_x * self.sigma_y, self.sigma_y**2]
             ])
+            # matrix is by definition symmetric. Apparently not always positive definite?
+
+            # print(f"{self.rho=}")
+            # print(f"{self.sigma_x=}")
+            # print(f"{self.sigma_y=}")
+
+            # print("COVARIANCE MATRIX: ")
+            # print(cov_matrix)
             
             # Create the multivariate normal distribution
             mean = np.array([self.mean_x, self.mean_y])
-            rv = multivariate_normal(mean, cov_matrix)
+            rv = multivariate_normal(mean, cov_matrix, allow_singular=True)
             
             # Evaluate the PDF on the grid
             gaussian = rv.pdf(pos) * self.weight
