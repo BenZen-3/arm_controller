@@ -1,5 +1,4 @@
 from scipy.stats import multivariate_normal
-from sklearn.mixture import GaussianMixture
 from sklearn.utils import check_random_state
 from abc import ABC, abstractmethod
 import numpy as np

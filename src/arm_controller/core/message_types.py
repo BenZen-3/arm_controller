@@ -186,3 +186,12 @@ class ArmDescriptionMessage(Message):
 
     def __repr__(self):
         return f"ArmDescriptionMessage(l1={self.l_1}, l2={self.l_2}, m1={self.m_1}, m2={self.m_2}, g={self.g})"
+    
+
+@dataclass(frozen=True)
+class BooleanMessage(Message):
+    """boolean message"""
+    value: bool
+
+    def __repr__(self):
+        return f"BooleanMessage(value={self.value})"

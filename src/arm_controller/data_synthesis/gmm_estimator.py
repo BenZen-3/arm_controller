@@ -1,8 +1,4 @@
-import numpy as np
-from scipy.stats import multivariate_normal
 from sklearn.mixture import GaussianMixture
-from sklearn.utils import check_random_state
-from abc import ABC, abstractmethod
 import numpy as np
 from typing import List
 
@@ -217,7 +213,7 @@ class ArmFitter:
         """
         fits the arm's sdf probability distribution to a gaussian mixture model. 
         
-        returns list of gaussian parans
+        returns List of (mean_x, mean_y, sigma_x, sigma_y, rho, weight) tuples
         """
         
         # create a combined distribution and fit it with gaussians

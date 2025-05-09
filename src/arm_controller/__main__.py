@@ -2,26 +2,28 @@ import argparse
 import time
 from pathlib import Path
 
-from .core.message_bus import MessageBus
-from .core.message_types import PathMessage
-from .simulation.sim_manager import SimManager
+from arm_controller.core.message_bus import MessageBus
+from arm_controller.core.message_types import PathMessage
+from arm_controller.simulation.sim_manager import SimManager
+from arm_controller.data_synthesis.sim_observer import Observer
 
 """
 todo:
-    different frequencies for arm controller, observer and master simulation
-
+    Files that are ChatGPT (or older) and require some attention:
+        gmm_visualizer.py
+        arm_visualizer.py
+        gmm_estimator.py
+        probability.py
 """
 
 
 def main():
-    """
-    main program start
-    """
+    """main program start"""
 
     parser = argparse.ArgumentParser(description="Arm controller Package")
     parser.add_argument(
         '--mode', 
-        choices=['generator', 'trainer', 'inference', 'visualize', "testing"], 
+        choices=['generator', 'trainer', 'inference', 'visualize', "view_recording", "testing"], 
         default='generator',
         help='Choose which module to run. Generate data, train on data, or predict a sequence from a random starting state'
     )
@@ -39,6 +41,8 @@ def main():
         model_inference(bus)
     elif args.mode == 'visualize':
         visualize(bus)
+    elif args.mode == 'view_recording':
+        view_recording(bus)
     elif args.mode == 'testing':
         testing(bus)
 
@@ -58,6 +62,9 @@ def set_public_states(bus: MessageBus):
 def generate_data(bus: MessageBus):
     """generate and save data"""
 
+    # 100 sims, 100 seconds, 100hz sim freq, 8hz GMM estimation. 338.96 seconds
+    # 236 GMM approximations / second on laptop
+    # 5184 sims covers every example with 5deg offsets. at 8hz thats 5hrs of data collection 
     manager = SimManager(bus, 10, 100)
     manager.batch_process()
 
@@ -77,6 +84,17 @@ def visualize(bus: MessageBus):
     manager = SimManager(bus, 10, 100, save_sim=False)
     observer = manager.run_single_simulation(0, 10)
     observer.visualize()
+
+def view_recording(bus: MessageBus):
+
+    name = '4'
+
+    folder = bus.get_state("common/data_directory").path
+    for file in folder.iterdir():
+        if file.suffix == ".pkl" and name in str(file):
+            observer: Observer = Observer.load(file)
+            observer.visualize()
+            break
 
 
 def testing(bus: MessageBus):

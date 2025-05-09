@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 import pickle
+from pathlib import Path
 
 from arm_controller.core.message_bus import MessageBus
-from arm_controller.core.message_types import TimingMessage
+from arm_controller.core.message_types import TimingMessage, BooleanMessage
 from arm_controller.visualization.arm_visualizer import ArmVisualizer
 from arm_controller.visualization.gmm_visualizer import GMMVisualizer
 from arm_controller.data_synthesis.gmm_estimator import ArmFitter
+from arm_controller.data_synthesis.data_diffuser import Diffuser
 
 class Observer(ABC):
 
@@ -37,6 +39,14 @@ class Observer(ABC):
         """visualize what the observer is seeing. Each observer has its own visualizer"""
         pass
 
+    @classmethod
+    def load(cls, path: Path):
+        """
+        Class method to load a recording from a file
+        """
+        with open(path, 'rb') as file:
+            return pickle.load(file)
+
     def save(self):
         """pickle the observer for later"""
 
@@ -58,7 +68,7 @@ class JointStateObserver(Observer):
         state = self.bus.get_state("arm/arm_state")
         self.history.append(state)
 
-    def visualize(self):
+    def visualize(self, playback_speed: float=1):
         """visualize the arm's state history"""
 
         l_1, l_2 = self.arm_description.l_1, self.arm_description.l_2
@@ -73,7 +83,7 @@ class GMMObserver(Observer):
         super().__init__(bus, frequency)
         self.num_gaussians = num_gaussians
         self.history = []
-        self.gmm_estimate_history = []
+        self.gmm_estimate_history = [] # List of List of Tuples
 
         self.arm_fitter = ArmFitter(self.arm_description)
 
@@ -85,12 +95,39 @@ class GMMObserver(Observer):
         gmm_params = self.arm_fitter.fit_arm(state)
         self.gmm_estimate_history.append(gmm_params)
 
-    def visualize(self):
-
-        # l_1, l_2 = self.arm_description.l_1, self.arm_description.l_2
-        # visualizer = ArmVisualizer(self.history, playback_speed=1, l_1=l_1, l_2=l_2, sim_rate_hz=self.frequency)
-        # visualizer.play()
+    def visualize(self, playback_speed: float=1):
 
         # gmm_param_history: List of frames, each a list of 6-tuples
         visualizer = GMMVisualizer(self.gmm_estimate_history, playback_speed=1.0, data_collection_hz=self.frequency)
+        visualizer.play()
+
+class DiffusionObserver(GMMObserver):
+    def __init__(self, bus: MessageBus, frequency: int=None, num_gaussians: int=4):
+        super().__init__(bus, frequency, num_gaussians)
+
+        self.bus.subscribe("sim/sim_running", self.after_sim)
+
+
+    def after_sim(self, msg: BooleanMessage):
+        
+        diffuser = Diffuser(self.gmm_estimate_history)
+        self.history, self.noise = diffuser.forward_diffusion()
+        
+    def fuse_history(self, history):
+        """
+        Flattens history[time][diffusion_step][gaussian] -> history[time * diffusion_step][gaussian]
+        Treats each diffusion step as a unique time step in the final sequence.
+        """
+        fused = []
+
+        for time_step in history:
+            for diffusion_step in time_step:
+                fused.append(diffusion_step)  # each is a list of Gaussians (tuples)
+
+        return fused
+    
+    def visualize(self, playback_speed: float=1):
+
+        fused_history = self.fuse_history(self.history)
+        visualizer = GMMVisualizer(fused_history, playback_speed=1.0, data_collection_hz=self.frequency)
         visualizer.play()

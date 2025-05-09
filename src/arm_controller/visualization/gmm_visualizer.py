@@ -21,6 +21,7 @@ class GMMVisualizer:
         gmm_param_history: list of list of Gaussian tuples over time.
         Each frame is a list of (mean_x, mean_y, sigma_x, sigma_y, rho, weight)
         """
+
         self.gmm_param_history = self._downsample(gmm_param_history, data_collection_hz, self.DEFAULT_PLAYBACK_HZ)
         self.interval_ms = (1000 / self.DEFAULT_PLAYBACK_HZ) / playback_speed
         self.mesh_grid = ProbabilityDistribution.create_mesh_grid(grid_size=grid_size, plot_range=plot_range)
@@ -47,6 +48,7 @@ class GMMVisualizer:
 
     def _update(self, frame):
         gmm_params = self.gmm_param_history[frame]
+        print(gmm_params)
         gmm_dist = GaussianMixtureDistribution(gmm_params, mesh_grid=self.mesh_grid)
         prob = gmm_dist.get_probability()
 
@@ -71,3 +73,23 @@ class GMMVisualizer:
         )
         plt.tight_layout()
         plt.show()
+
+
+# class GMMDiffusionVisualizer(GMMVisualizer):
+#     def __init__(self, diffused_gmm_param_history, playback_speed = 1, data_collection_hz = 100, grid_size = 64, plot_range = (-2.1, 2.1)):
+
+#         gmm_param_history = self.fuse_history(diffused_gmm_param_history)
+#         super().__init__(gmm_param_history, playback_speed, data_collection_hz, grid_size, plot_range)
+
+#     def fuse_history(self, history):
+#         """
+#         Flattens history[time][diffusion_step][gaussian] -> history[time * diffusion_step][gaussian]
+#         Treats each diffusion step as a unique time step in the final sequence.
+#         """
+#         fused = []
+
+#         for time_step in history:
+#             for diffusion_step in time_step:
+#                 fused.append(diffusion_step)  # each is a list of Gaussians (tuples)
+
+#         return fused
