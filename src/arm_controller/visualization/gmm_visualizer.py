@@ -2,10 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from typing import List, Tuple
-import time
 
 from arm_controller.data_synthesis.probability import GaussianMixtureDistribution
 from arm_controller.data_synthesis.probability import ProbabilityDistribution
+
+# TODO: SEPARATE VIEW AND PLOT RANGES. VIEW HAS TO BE LESS THAN OR EQUAL OR PLOT
 
 class GMMVisualizer:
     DEFAULT_PLAYBACK_HZ = 30
@@ -16,7 +17,8 @@ class GMMVisualizer:
         playback_speed: float = 1.0,
         data_collection_hz: int = 100,
         grid_size: int = 64,
-        plot_range: Tuple[float, float] = (-2.1, 2.1)
+        plot_range: Tuple[float, float] = (-2.1, 2.1),
+        view_range: Tuple[float, float] = (-2.1, 2.1)
     ):
         """
         gmm_param_history: list of list of Gaussian tuples over time.
@@ -31,8 +33,8 @@ class GMMVisualizer:
         plt.style.use('dark_background')
         self.fig, self.ax = plt.subplots()
         self.ax.set_title("GMM Approximation Over Time")
-        self.ax.set_xlim(plot_range)
-        self.ax.set_ylim(plot_range)
+        self.ax.set_xlim(view_range)
+        self.ax.set_ylim(view_range)
         self.ax.set_aspect('equal')
 
         # Initialize heatmap and scatter

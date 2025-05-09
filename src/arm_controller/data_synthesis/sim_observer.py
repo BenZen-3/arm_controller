@@ -109,7 +109,7 @@ class DiffusionObserver(GMMObserver):
 
     def after_sim(self, msg: BooleanMessage):
         
-        diffuser = Diffuser(self.gmm_estimate_history, n_diffusion_steps=self.n_diffusion_steps)
+        diffuser = Diffuser(self.gmm_estimate_history, n_diffusion_steps=self.n_diffusion_steps, schedule_name="cosine")
         self.history, self.noise = diffuser.forward_diffusion()
         
     def fuse_history(self, history):
