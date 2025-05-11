@@ -25,6 +25,8 @@ class GMMVisualizer:
         Each frame is a list of (mean_x, mean_y, sigma_x, sigma_y, rho, weight)
         """
 
+
+
         self.gmm_param_history = self._downsample(gmm_param_history, data_collection_hz, self.DEFAULT_PLAYBACK_HZ)
         self.interval_ms = (1000 / self.DEFAULT_PLAYBACK_HZ) / playback_speed
         self.mesh_grid = ProbabilityDistribution.create_mesh_grid(grid_size=grid_size, plot_range=plot_range)

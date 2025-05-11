@@ -28,10 +28,15 @@ class ProbabilityDistribution(ABC):
         plot_range : tuple, optional
             Range of x and y coordinates if creating a new meshgrid (default: (-5, 5))
         """
+
+        self.plot_range = plot_range
+
         if mesh_grid is None:
+            self.grid_size = grid_size
             self.mesh_grid = self.create_mesh_grid(grid_size, plot_range)
         else:
             self.mesh_grid = mesh_grid
+            self.grid_size = np.shape(mesh_grid)[1] # JANK
         
         # The cached probability density distribution
         self._probability = None
@@ -362,19 +367,19 @@ class GaussianDistribution(ProbabilityDistribution):
                 [self.sigma_x**2, self.rho * self.sigma_x * self.sigma_y],
                 [self.rho * self.sigma_x * self.sigma_y, self.sigma_y**2]
             ])
-            # matrix is by definition symmetric. Apparently not always positive definite?
 
-            # print(f"{self.rho=}")
-            # print(f"{self.sigma_x=}")
-            # print(f"{self.sigma_y=}")
-
-            # print("COVARIANCE MATRIX: ")
-            # print(cov_matrix)
+            # matrix is by definition symmetric. Not always positive definite. check det.
+            if np.linalg.det(cov_matrix) < 0:
+                return np.zeros((self.grid_size, self.grid_size))
             
             # Create the multivariate normal distribution
             mean = np.array([self.mean_x, self.mean_y])
-            rv = multivariate_normal(mean, cov_matrix, allow_singular=True)
-            
+            try:
+                rv = multivariate_normal(mean, cov_matrix, allow_singular=True)
+            except Exception as e:
+                print(cov_matrix)
+
+
             # Evaluate the PDF on the grid
             gaussian = rv.pdf(pos) * self.weight
             
@@ -422,7 +427,7 @@ class GaussianMixtureDistribution(ProbabilityDistribution):
         super().__init__(mesh_grid, grid_size, plot_range)
         
         self.gaussians = []
-        if gaussian_params:
+        if gaussian_params is not None:
             for params in gaussian_params:
                 mean_x, mean_y, sigma_x, sigma_y, rho, weight = params
                 self.add_gaussian(mean_x, mean_y, sigma_x, sigma_y, rho, weight)

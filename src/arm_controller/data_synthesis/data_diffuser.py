@@ -1,74 +1,63 @@
 import numpy as np
 
 class Diffuser:
-
-    def __init__(self, gmm_estimate_history, n_diffusion_steps: int=20, schedule_name: str="linear"):
-        self.gmm_estimate_history = gmm_estimate_history
+    def __init__(self, gmm_estimate_history, n_diffusion_steps: int = 20, schedule_name: str = "linear"):
         self.n_diffusion_steps = n_diffusion_steps
-        self.diffused_gmm_history = []
-        self.noise_history = [] 
+        self.schedule_name = schedule_name
+        self.gmm_estimate_history = gmm_estimate_history  # List[Frame[List[GMM]]]
+        
+        # Convert input to NumPy array of shape (n_frames, n_gaussians, 6)
+        self.data = np.array([
+            [list(g) for g in frame]
+            for frame in gmm_estimate_history
+        ], dtype=np.float32)
 
-        self.set_beta_schedule(schedule_name)
+        self.n_frames, self.n_gaussians, self.n_params = self.data.shape
+        assert self.n_params == 6, "Each Gaussian must have 6 parameters"
 
-    def set_beta_schedule(self, name: str="linear"):
+        self._prepare_schedule()
+        self.diffused_gmm_history = None
+        self.noise_history = None
 
-        match name:
-            case "linear":
-                self.schedule_fn = lambda t: 1e-4 + (t / self.n_diffusion_steps) * (0.02 - 1e-4)
-            case "cosine":
-                self.schedule_fn = lambda t: min(0.999, max(1e-5, 0.5 * (1 - np.cos(np.pi * t / self.n_diffusion_steps)))) * (0.02 - 1e-4)
+    def _prepare_schedule(self):
+        t = np.linspace(0, 1, self.n_diffusion_steps + 1)[1:]  # Skip t=0
+        if self.schedule_name == "linear":
+            beta = 1e-4 + t * (0.02 - 1e-4)
+        elif self.schedule_name == "cosine":
+            beta = np.clip(0.5 * (1 - np.cos(np.pi * t)) * (0.02 - 1e-4), 1e-5, 0.999)
+        else:
+            raise ValueError(f"Unknown schedule: {self.schedule_name}")
+        
+        alpha = 1.0 - beta
+        self.alpha_bar = np.cumprod(alpha)
 
     def forward_diffusion(self):
-        self.diffused_gmm_history = []
-        self.noise_history = []
+        x_0 = self.data  # shape: (n_frames, n_gaussians, 6)
+        T = self.n_diffusion_steps
 
-        for frame in self.gmm_estimate_history:
-            current_frame = list(frame)  # start from original Gaussians
-            frame_diffused = []
-            frame_noise = []
+        scales = np.array([3.0, 3.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32)  # scaling per param
 
-            # Initialize current state per Gaussian
-            current_gaussians = [list(g) for g in current_frame]  # deep copy for mutation
+        diffused = np.zeros((self.n_frames, T, self.n_gaussians, 6), dtype=np.float32)
+        noises = np.zeros_like(diffused)
 
-            for step in range(1, self.n_diffusion_steps + 1):
-                beta_t = self.schedule_fn(step)
-                sqrt_1m_beta = np.sqrt(1 - beta_t)
-                sqrt_beta = np.sqrt(beta_t)
+        for t in range(T):
+            sqrt_alpha_bar = np.sqrt(self.alpha_bar[t])
+            sqrt_1m_alpha_bar = np.sqrt(1 - self.alpha_bar[t]) # sqrt(1 - a_bar)
 
-                step_diffused = []
-                step_noise = []
+            # chat made this sick *x_0.shape. def stealing that
+            eps = np.random.randn(*x_0.shape).astype(np.float32) * scales 
 
-                for g in current_gaussians:
-                    mean_x, mean_y, sigma_x, sigma_y, rho, weight = g
+            x_t = sqrt_alpha_bar * x_0 + sqrt_1m_alpha_bar * eps
+            diffused[:, t] = x_t
+            noises[:, t] = eps
 
-                    # Sample noise for each parameter
-                    noise = np.random.normal(0, 1, size=6)
+        # Clip rho and weight for numerical stability
+        diffused[..., 4] = np.clip(diffused[..., 4], -1.0, 1.0)
+        diffused[..., 5] = np.clip(diffused[..., 5], 0.0, 1.0)  
 
-                    mean_scale = 3
-                    sigma_scale = 1
-                    rho_scale = 1
-                    weight_scale = 1
-
-                    # Apply noise cumulatively
-                    new_mean_x = sqrt_1m_beta * mean_x + sqrt_beta * noise[0] * mean_scale
-                    new_mean_y = sqrt_1m_beta * mean_y + sqrt_beta * noise[1] * mean_scale
-                    new_sigma_x = max(sqrt_1m_beta * sigma_x + sqrt_beta * noise[2] * sigma_scale, 1e-6)
-                    new_sigma_y = max(sqrt_1m_beta * sigma_y + sqrt_beta * noise[3] * sigma_scale, 1e-6)
-                    new_rho = np.clip(sqrt_1m_beta * rho + sqrt_beta * noise[4] * rho_scale, -1.0, 1.0)
-                    new_weight = np.clip(sqrt_1m_beta * weight + sqrt_beta * noise[5] * weight_scale, 0.0, 1.0)
-
-                    new_g = [new_mean_x, new_mean_y, new_sigma_x, new_sigma_y, new_rho, new_weight]
-                    noise_g = [noise[0] * mean_scale, noise[1] * mean_scale, noise[2] * sigma_scale, noise[3] * sigma_scale, noise[4] * rho_scale, noise[5] * weight_scale]
-
-                    step_diffused.append(tuple(new_g))
-                    step_noise.append(tuple(noise_g))
-
-                current_gaussians = [list(g) for g in step_diffused]
-                frame_diffused.insert(0, step_diffused)
-                frame_noise.insert(0, step_noise)
-
-            self.diffused_gmm_history.append(frame_diffused)
-            self.noise_history.append(frame_noise)
+        # Rescale back to original space
+        self.diffused_gmm_history = diffused / scales
+        self.noise_history = noises
 
         return self.diffused_gmm_history, self.noise_history
 
