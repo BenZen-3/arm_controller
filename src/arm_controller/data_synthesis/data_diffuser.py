@@ -1,4 +1,14 @@
 import numpy as np
+from dataclasses import dataclass
+from typing import Any
+
+@dataclass(frozen=True)
+class DiffusionInput:
+    diffused_gmm_history: Any
+    noise_history: Any
+    noise_scale_history: Any
+    conditioning_history: Any
+
 
 class Diffuser:
     def __init__(self, gmm_estimate_history, n_diffusion_steps: int = 20, schedule_name: str = "linear"):
@@ -39,6 +49,7 @@ class Diffuser:
 
         diffused = np.zeros((self.n_frames, T, self.n_gaussians, 6), dtype=np.float32)
         noises = np.zeros_like(diffused)
+        t_schedule = np.zeros((self.n_frames, T), dtype=np.int32)
 
         for t in range(T):
             sqrt_alpha_bar = np.sqrt(self.alpha_bar[t])
@@ -50,16 +61,18 @@ class Diffuser:
             x_t = sqrt_alpha_bar * x_0 + sqrt_1m_alpha_bar * eps
             diffused[:, t] = x_t
             noises[:, t] = eps
+            t_schedule[:, t] = t
 
         # Clip rho and weight for numerical stability
         diffused[..., 4] = np.clip(diffused[..., 4], -1.0, 1.0)
         diffused[..., 5] = np.clip(diffused[..., 5], 0.0, 1.0)  
 
-        # Rescale back to original space
-        self.diffused_gmm_history = diffused / scales
+        # set the variables
+        self.diffused_gmm_history = diffused
         self.noise_history = noises
+        self.t_schedule = t_schedule
 
-        return self.diffused_gmm_history, self.noise_history
+        return self.diffused_gmm_history, self.noise_history, self.t_schedule
 
     def get_diffused_history(self):
         return self.diffused_gmm_history

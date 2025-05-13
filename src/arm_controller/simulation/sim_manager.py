@@ -8,13 +8,14 @@ from arm_controller.core.message_types import SimStateMessage, TimingMessage, Ca
 from arm_controller.simulation.arm_dynamics import Arm
 from arm_controller.simulation.arm_controller import Controller, NoController
 from arm_controller.data_synthesis.sim_observer import Observer, JointStateObserver, GMMObserver, DiffusionObserver
+from arm_controller.learning.diffusion_dataset import DiffusionDataset
 
 class SimManager:
     """Class for managing multiple simulations"""
 
     DEFAULT_FREQUENCY = 100
 
-    def __init__(self, bus: MessageBus, num_sims: int, total_time: float, save_sim: bool=True):
+    def __init__(self, bus: MessageBus, num_sims: int, total_time: float, save_type: str="dataset"):
         """
         Initialize the SimManager.
         
@@ -26,7 +27,7 @@ class SimManager:
         self.bus = bus
         self.num_sims = num_sims
         self.total_time = total_time
-        self.save_sim = save_sim
+        self.save_type = save_type
 
     def run_single_simulation(self, sim_id: int, total_time: float, frequency: int=None) -> Observer:
 
@@ -43,17 +44,40 @@ class SimManager:
         controller = NoController(sim_bus)
         # observer = JointStateObserver(sim_bus)
         # observer = GMMObserver(sim_bus, 8)
-        observer = DiffusionObserver(sim_bus, 10, n_diffusion_steps=40)
+        observer = DiffusionObserver(sim_bus, frequency=10, n_diffusion_steps=20)
 
         # run the sim
         sim = Simulation(sim_bus, total_time, frequency, arm, controller, observer)
         sim.run()
 
         # save data
-        if self.save_sim:
-            observer.save()
+        self.save(sim_bus, observer)
         
         return observer
+
+    def save(self, sim_bus: MessageBus, observer: Observer):
+        """saves whatever you actually wanna save"""
+
+        match self.save_type.lower():
+
+            case "observer":
+                observer.save()
+
+            case "dataset":
+                diffused_gmm_history = observer.fused_gmm_diff_history
+                noise_history = observer.fused_noise_history
+                noise_scale_history = observer.fused_t_schedule_history
+                state_history = observer.history
+                dataset = DiffusionDataset(bus = sim_bus, 
+                                           n_diffusion_steps = observer.n_diffusion_steps,
+                                           diffused_gmm_history = diffused_gmm_history,
+                                           noise_history = noise_history,
+                                           noise_scale_history = noise_scale_history,
+                                           state_history = state_history)
+                dataset.save()
+
+            case "None":
+                pass
 
     def batch_process(self):
         """Run all simulations in parallel and collect the results."""

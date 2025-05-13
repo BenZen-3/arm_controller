@@ -3,7 +3,7 @@ import pickle
 from pathlib import Path
 
 from arm_controller.core.message_bus import MessageBus
-from arm_controller.core.message_types import TimingMessage, BooleanMessage
+from arm_controller.core.message_types import TimingMessage, BooleanMessage, ArmStateMessage
 from arm_controller.visualization.arm_visualizer import ArmVisualizer
 from arm_controller.visualization.gmm_visualizer import GMMVisualizer
 from arm_controller.data_synthesis.gmm_estimator import ArmFitter
@@ -89,7 +89,7 @@ class GMMObserver(Observer):
 
     def obsesrve_state(self, msg: TimingMessage):
         
-        state = self.bus.get_state("arm/arm_state")
+        state: ArmStateMessage = self.bus.get_state("arm/arm_state")
         self.history.append(state)
 
         gmm_params = self.arm_fitter.fit_arm(state)
@@ -107,14 +107,21 @@ class DiffusionObserver(GMMObserver):
         self.n_diffusion_steps = n_diffusion_steps
         self.bus.subscribe("sim/sim_running", self.after_sim)
 
+        self.fused_gmm_diff_history = []
+        self.fused_noise_history = []
+
     def after_sim(self, msg: BooleanMessage):
+        """triggered after simulation ends"""
         
         diffuser = Diffuser(self.gmm_estimate_history, n_diffusion_steps=self.n_diffusion_steps, schedule_name="cosine")
-        self.history, self.noise = diffuser.forward_diffusion()
-        
+        self.diffusion_history, self.noise_history, self.t_schedule_history = diffuser.forward_diffusion()
+        self.fused_gmm_diff_history = self.fuse_history(self.diffusion_history)
+        self.fused_noise_history = self.fuse_history(self.noise_history)
+        self.fused_t_schedule_history = self.fuse_history(self.t_schedule_history)
+
     def fuse_history(self, history):
         """
-        Flattens history[time][diffusion_step][gaussian] -> history[time * diffusion_step][gaussian]
+        Flattens history[time][diffusion_step][num_gaussians][gaussian] -> history[time * diffusion_step][num_gaussians][gaussian]
         Treats each diffusion step as a unique time step in the final sequence.
         """
         fused = []
@@ -125,8 +132,17 @@ class DiffusionObserver(GMMObserver):
 
         return fused
     
-    def visualize(self, playback_speed: float=1):
+    # def get_conditioning_history(self):
+    #     """take a vector of the past history and convert it into [time * diffusion step][condition vector]"""
 
-        fused_history = self.fuse_history(self.history)
-        visualizer = GMMVisualizer(fused_history, playback_speed=1, data_collection_hz=self.frequency)
+    #     for state in self.history:
+            
+    #         for step in self.n_diffusion_steps:
+                
+    #             condition = state.theta_1, state.theta_2
+    
+    def visualize(self, playback_speed: float=1):
+        """visualize the gmm diffusion process"""
+        
+        visualizer = GMMVisualizer(self.fused_gmm_diff_history, playback_speed=1, data_collection_hz=self.frequency)
         visualizer.play()

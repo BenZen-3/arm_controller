@@ -1,6 +1,8 @@
 import argparse
 import time
 from pathlib import Path
+import cProfile
+import pstats
 
 from arm_controller.core.message_bus import MessageBus
 from arm_controller.core.message_types import PathMessage
@@ -65,6 +67,7 @@ def generate_data(bus: MessageBus):
     # 100 sims, 100 seconds, 100hz sim freq, 8hz GMM estimation. 338.96 seconds
     # 236 GMM approximations / second on laptop
     # 5184 sims covers every example with 5deg offsets. at 8hz thats 5hrs of data collection 
+    # sims with 40-step diffusion pre-calculation are about 4.3s/sim. about 1s longer
     manager = SimManager(bus, 10, 100)
     manager.batch_process()
 
@@ -81,7 +84,7 @@ def model_inference(bus: MessageBus):
 
 def visualize(bus: MessageBus):
 
-    manager = SimManager(bus, 10, 100, save_sim=False)
+    manager = SimManager(bus, 10, 100, save_type="None")
     observer = manager.run_single_simulation(0, 10)
     observer.visualize()
 
@@ -99,10 +102,26 @@ def view_recording(bus: MessageBus):
 
 def testing(bus: MessageBus):
 
-    # testing stuff
-    pass
+    manager = SimManager(bus, 10, 100, save_type="dataset")
+    observer = manager.run_single_simulation(0, 10)
 
+    # for i in range(10):
+    #     manager = SimManager(bus, 10, 100, save_type="None")
+    #     observer = manager.run_single_simulation(0, 10)
 
+def profile_func(func, *args):
+    """
+    profiler
+    """
+
+    with cProfile.Profile() as pr:
+        func(*args)
+
+    stats = pstats.Stats(pr)
+    stats.sort_stats(pstats.SortKey.TIME)
+    stats.print_stats()
 
 if __name__ == "__main__":
     main()
+
+    # profile_func(main)
