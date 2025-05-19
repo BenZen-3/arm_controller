@@ -8,6 +8,7 @@ from arm_controller.core.message_bus import MessageBus
 from arm_controller.core.message_types import PathMessage
 from arm_controller.simulation.sim_manager import SimManager
 from arm_controller.data_synthesis.sim_observer import Observer
+from arm_controller.learning.model import DiffusionMLP
 
 """
 todo:
@@ -68,13 +69,19 @@ def generate_data(bus: MessageBus):
     # 236 GMM approximations / second on laptop
     # 5184 sims covers every example with 5deg offsets. at 8hz thats 5hrs of data collection 
     # sims with 40-step diffusion pre-calculation are about 4.3s/sim. about 1s longer
-    manager = SimManager(bus, 10, 100)
+    manager = SimManager(bus, 100, 100)
     manager.batch_process()
 
+    # NEW: 100 sims, 608 seconds OUCH
+
 def train_model(bus: MessageBus):
-    
-    # use train.py
-    pass
+
+    save_location = bus.get_state("common/model_directory").path
+    file_name = save_location.joinpath(f"{0}_model.pt")
+
+    model = DiffusionMLP(bus)
+    model.train_model(10, 1024, .001)
+    model.save_model(file_name)
 
 def model_inference(bus: MessageBus):
 

@@ -30,8 +30,13 @@ class DiffusionDataset(Dataset):
         Returns conditioning history aligned with diffusion inputs.
         Shape: (total_samples, num_conditioning_states, 2)
         """
+        
+        total_samples = len(self.noise_history)
         num_conditioning_states = self.num_conditioning_states
         n_diffusion_steps = self.n_diffusion_steps
+
+        if state_history is None:
+            return np.zeros((total_samples, num_conditioning_states, 2))
 
         # Extract (theta_1, theta_2) from each state
         joint_history = np.array([[s.theta_1, s.theta_2] for s in state_history], dtype=np.float32)
@@ -75,7 +80,7 @@ class DiffusionDataset(Dataset):
         """
         Loads the dataset from the given path and returns a new instance of the dataset.
         """
-        data = torch.load(path)
+        data = torch.load(path, weights_only=False)
         dataset = cls(
             bus=bus,
             n_diffusion_steps=data["n_diffusion_steps"],
@@ -87,7 +92,7 @@ class DiffusionDataset(Dataset):
         dataset.num_conditioning_states = data["num_conditioning_states"]
         dataset.conditioning_history = data["conditioning_history"]
 
-        print(f"Dataset loaded from: {path}")
+        # print(f"Dataset loaded from: {path}")
         return dataset
 
     def __len__(self):
